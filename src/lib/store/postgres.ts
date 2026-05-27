@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Pool } from 'pg';
 import type { JWK } from 'jose';
@@ -32,13 +32,19 @@ export class PgStore implements Store {
   }
 
   async init(): Promise<void> {
-    const sql = await readFile(
-      join(process.cwd(), 'migrations', '0001_init.sql'),
-      'utf8',
-    );
+    // Apply every migration file in lexical order. Each .sql file is
+    // its own transaction inside the per-file pool.query call; the
+    // files themselves are written to be idempotent (IF NOT EXISTS /
+    // IF EXISTS) where applicable, so re-running them on an already-
+    // migrated database is safe.
+    const dir = join(process.cwd(), 'migrations');
+    const files = (await readdir(dir)).filter((f) => f.endsWith('.sql')).sort();
     const client = await this.pool.connect();
     try {
-      await client.query(sql);
+      for (const file of files) {
+        const sql = await readFile(join(dir, file), 'utf8');
+        await client.query(sql);
+      }
     } finally {
       client.release();
     }
