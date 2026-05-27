@@ -14,6 +14,8 @@ import {
   linkConfirmedPage,
   linkErrorPage,
 } from '../views/link.js';
+import { operatorPage } from '../views/operator.js';
+import { policyPage } from '../views/policy.js';
 
 export function createPageRoutes(deps: { store: Store; redis: Redis }): Hono {
   const { store, redis } = deps;
@@ -23,6 +25,28 @@ export function createPageRoutes(deps: { store: Store; redis: Redis }): Hono {
 
   app.get('/', async (c) =>
     c.html(await layout({ title: 'trust.afauth.org', path: '/', body: landingPage() })),
+  );
+
+  // ------ /operator and /policy -------------------------------------
+
+  app.get('/operator', async (c) =>
+    c.html(
+      await layout({
+        title: 'Operator commitment · trust.afauth.org',
+        path: '/operator',
+        body: operatorPage(),
+      }),
+    ),
+  );
+
+  app.get('/policy', async (c) =>
+    c.html(
+      await layout({
+        title: 'Take-down policy · trust.afauth.org',
+        path: '/policy',
+        body: policyPage(),
+      }),
+    ),
   );
 
   // ------ /link (deep-link confirm) ---------------------------------

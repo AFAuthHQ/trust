@@ -200,6 +200,8 @@ export function layout(opts: LayoutOpts): HtmlEscapedString | Promise<HtmlEscape
 <header class="site"><nav>
   <strong>trust.afauth.org</strong>
   <a href="/account">Account</a>
+  <a href="/operator">Operator</a>
+  <a href="/policy">Policy</a>
   <span class="spacer"></span>
   <a href="https://afauth.org" rel="noopener">afauth.org &#8599;</a>
   <a href="https://github.com/AFAuthHQ/spec/blob/main/proposals/0006-afauth-trust-attestor.md" target="_blank" rel="noopener">AFAP-0006 &#8599;</a>
