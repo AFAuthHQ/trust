@@ -40,7 +40,7 @@ const ConfigSchema = z.object({
   JWKS_PUBLIC_URL: z
     .string()
     .url()
-    .default('https://afauth.org/.well-known/jwks.json'),
+    .default('https://trust.afauth.org/.well-known/jwks.json'),
 
   EMAIL_PROVIDER: z.enum(['stdout', 'resend', 'postmark']).default('stdout'),
   EMAIL_FROM: z.string().email().default('no-reply@trust.afauth.org'),

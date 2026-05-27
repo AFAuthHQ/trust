@@ -14,7 +14,7 @@ export function landingPage() {
       <a href="https://github.com/AFAuthHQ/spec/blob/main/proposals/0006-afauth-trust-attestor.md" target="_blank" rel="noopener">AFAP-0006</a>,
       this service issues short-lived JWTs that consuming services
       verify offline against
-      <code>https://afauth.org/.well-known/jwks.json</code>.
+      <code>https://trust.afauth.org/.well-known/jwks.json</code>.
       The token signals only that <em>some</em> human is behind the
       agent and which verification method they used; it carries no
       personal data.
@@ -34,12 +34,11 @@ export function landingPage() {
       <code>billing.accepted_attestors</code> list. The reference
       TypeScript SDK ships a pre-configured verifier:
     </p>
-    <pre style="background: var(--code); padding: 12px 14px; border-radius: 4px; overflow-x: auto; font-size: 12px;"><code>import { JwksAttestor } from '@afauthhq/server';
+    <pre style="background: var(--code); padding: 12px 14px; border-radius: 4px; overflow-x: auto; font-size: 12px;"><code>import { trustAttestor } from '@afauthhq/server';
 
-const attestor = new JwksAttestor({
-  iss: 'afauth-trust',
-  jwksUrl: 'https://afauth.org/.well-known/jwks.json',
-});</code></pre>
+const attestor = trustAttestor();
+// Drop into Server({ attestor, ... }); JWKS resolves to
+// https://trust.afauth.org/.well-known/jwks.json by default.</code></pre>
 
     <h2>For agents</h2>
     <p>

@@ -8,8 +8,8 @@ issuing short-lived, audience-bound JWTs with `iss="afauth-trust"`
 that signal a human ↔ agent-DID binding to consuming services.
 
 Verification by consumers is offline against the JWKs document at
-`https://afauth.org/.well-known/jwks.json` (proxied to this service
-from the apex).
+`https://trust.afauth.org/.well-known/jwks.json` — served directly
+by this service.
 
 ## Status
 
@@ -143,13 +143,13 @@ Per-IP fixed-window in Redis.
    - `NODE_ENV=production`
    - `LOG_LEVEL=info`
    - `PUBLIC_BASE_URL=https://trust.afauth.org`
-   - `JWKS_PUBLIC_URL=https://afauth.org/.well-known/jwks.json`
+   - `JWKS_PUBLIC_URL=https://trust.afauth.org/.well-known/jwks.json`
    - `EMAIL_PROVIDER=<resend|postmark>` and `EMAIL_API_KEY=...`
-4. **Custom domain** → `trust.afauth.org`.
-5. Configure the `afauth.org` apex to reverse-proxy
-   `/.well-known/jwks.json` to this service so the AFAP-pinned URL
-   resolves.
-6. First deploy runs migrations on boot.
+4. **Custom domain** → `trust.afauth.org`. This is also the
+   AFAP-0006 §10.3.1 JWKS host — consuming services fetch
+   `https://trust.afauth.org/.well-known/jwks.json` directly. No
+   apex proxy needed.
+5. First deploy runs migrations on boot.
 
 ## License
 
