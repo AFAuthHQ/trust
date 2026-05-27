@@ -31,6 +31,12 @@ export class MemoryStore implements Store {
   private signingKeys = new Map<string, SigningKeyRecord>();
   private tokenLog: Array<TokenLogEntry & { issued_at: Date }> = [];
 
+  // Strictly monotonic createdAt for signing keys. Date.now() has
+  // 1ms resolution; two inserts in the same ms otherwise tie, which
+  // would make getActive()'s tiebreak non-deterministic. Postgres'
+  // now() has microsecond resolution and doesn't need this.
+  private signingKeyInsertCounter = 0;
+
   async init(): Promise<void> {}
   async close(): Promise<void> {}
 
@@ -249,6 +255,7 @@ export class MemoryStore implements Store {
       publicJwk: input.publicJwk,
       privateJwkEnc: input.privateJwkEnc,
       privateJwkIv: input.privateJwkIv,
+      createdAt: new Date(Date.now() + this.signingKeyInsertCounter++),
       activeFrom: input.activeFrom,
       retiredAt: null,
     };

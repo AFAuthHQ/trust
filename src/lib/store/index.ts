@@ -69,6 +69,8 @@ export interface SigningKeyRecord {
   privateJwkEnc: Buffer;
   /** 96-bit GCM IV. */
   privateJwkIv: Buffer;
+  /** Insertion timestamp; tiebreaks getActive() when two keys share activeFrom. */
+  createdAt: Date;
   activeFrom: Date;
   retiredAt: Date | null;
 }

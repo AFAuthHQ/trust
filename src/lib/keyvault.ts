@@ -40,6 +40,7 @@ export interface KeyMetadata {
   kid: string;
   alg: string;
   publicJwk: JWK;
+  createdAt: Date;
   activeFrom: Date;
   retiredAt: Date | null;
 }
@@ -116,6 +117,7 @@ export class PgEncryptedKeyVault implements KeyVault {
       kid: r.kid,
       alg: r.alg,
       publicJwk: r.publicJwk,
+      createdAt: r.createdAt,
       activeFrom: r.activeFrom,
       retiredAt: r.retiredAt,
     }));
@@ -137,7 +139,7 @@ export class PgEncryptedKeyVault implements KeyVault {
     const { ciphertext, iv } = this.encryptJwk(privateJwk);
 
     const activeFrom = opts.activeFrom ?? new Date();
-    await this.store.insertSigningKey({
+    const inserted = await this.store.insertSigningKey({
       kid,
       alg: ATTESTATION_JWT_ALG,
       publicJwk,
@@ -145,7 +147,14 @@ export class PgEncryptedKeyVault implements KeyVault {
       privateJwkIv: iv,
       activeFrom,
     });
-    return { kid, alg: ATTESTATION_JWT_ALG, publicJwk, activeFrom, retiredAt: null };
+    return {
+      kid,
+      alg: ATTESTATION_JWT_ALG,
+      publicJwk,
+      createdAt: inserted.createdAt,
+      activeFrom,
+      retiredAt: null,
+    };
   }
 
   async ensureActiveKey(): Promise<KeyMetadata> {
@@ -181,7 +190,17 @@ export class PgEncryptedKeyVault implements KeyVault {
     const now = Date.now();
     const eligible = all
       .filter((k) => k.retiredAt === null && k.activeFrom.getTime() <= now)
-      .sort((a, b) => b.activeFrom.getTime() - a.activeFrom.getTime());
+      .sort((a, b) => {
+        // Primary: most recently activated first.
+        const dt = b.activeFrom.getTime() - a.activeFrom.getTime();
+        if (dt !== 0) return dt;
+        // Tiebreak: most recently inserted. Sort stability is not
+        // enough here — when two rotations land in the same
+        // millisecond (operator double-click, fast tests), the
+        // newer one should win for deterministic "most recent"
+        // semantics.
+        return b.createdAt.getTime() - a.createdAt.getTime();
+      });
     return eligible[0] ?? null;
   }
 

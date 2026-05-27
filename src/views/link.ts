@@ -89,9 +89,10 @@ export function linkConfirmedPage(opts: { callbackUrl: string | null }) {
               Return to the agent
             </a>
           </p>
-          <script>
-            setTimeout(() => { window.location.href = ${JSON.stringify(opts.callbackUrl)}; }, 1500);
-          </script>
+          <p style="font-size: 13px; color: var(--muted);">
+            The agent has already been notified — closing this tab
+            is fine too.
+          </p>
         `
       : html`<p>You can close this tab.</p>`}
   `;

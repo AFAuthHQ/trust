@@ -44,6 +44,42 @@ export function createApp(deps: AppDeps): Hono {
     }
   });
 
+  // Security response headers. Applied to every response, including
+  // /v1/* JSON APIs — HSTS and X-Content-Type-Options are universally
+  // applicable; CSP is HTML-meaningful but doesn't hurt JSON.
+  //
+  // CSP allows 'unsafe-inline' for styles because views/layout.ts
+  // injects an inline <style> block (hash-based CSP is a possible
+  // future tightening if we extract the stylesheet to its own file).
+  // img-src allows the favicon hosted at https://afauth.org/favicon.svg.
+  app.use('*', async (c, next) => {
+    await next();
+    c.header(
+      'strict-transport-security',
+      'max-age=63072000; includeSubDomains; preload',
+    );
+    c.header('x-content-type-options', 'nosniff');
+    c.header('x-frame-options', 'DENY');
+    c.header('referrer-policy', 'strict-origin-when-cross-origin');
+    c.header(
+      'permissions-policy',
+      'camera=(), microphone=(), geolocation=(), payment=()',
+    );
+    c.header(
+      'content-security-policy',
+      [
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' https://afauth.org data:",
+        "connect-src 'self'",
+        "form-action 'self'",
+        "frame-ancestors 'none'",
+        "base-uri 'self'",
+      ].join('; '),
+    );
+  });
+
   app.onError((err, c) => {
     if (err instanceof TrustError) {
       return c.json(err.toEnvelope(), { status: err.status as 400 });

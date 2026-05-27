@@ -426,6 +426,7 @@ function toSigningKey(r: any): SigningKeyRecord {
     publicJwk: r.public_jwk as JWK,
     privateJwkEnc: r.private_jwk_enc,
     privateJwkIv: r.private_jwk_iv,
+    createdAt: r.created_at,
     activeFrom: r.active_from,
     retiredAt: r.retired_at,
   };
