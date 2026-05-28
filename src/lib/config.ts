@@ -110,6 +110,19 @@ const ConfigSchema = z.object({
    */
   GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
+}).superRefine((cfg, ctx) => {
+  // Hard guard: refuse to boot in production with the e2e escape
+  // hatch enabled. A "MUST NOT in production" comment is not an
+  // enforcement; this is. See TRUST_E2E_AUTOCONFIRM's doc above for
+  // why this matters (it bypasses §10 two-step verify).
+  if (cfg.NODE_ENV === 'production' && cfg.TRUST_E2E_AUTOCONFIRM) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['TRUST_E2E_AUTOCONFIRM'],
+      message:
+        'TRUST_E2E_AUTOCONFIRM must not be enabled when NODE_ENV=production',
+    });
+  }
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

@@ -49,3 +49,50 @@ describe('EMAIL_FROM validator', () => {
     expect(() => getConfig()).toThrow(/EMAIL_FROM/);
   });
 });
+
+describe('TRUST_E2E_AUTOCONFIRM production guard', () => {
+  beforeEach(() => {
+    setTestEnv();
+    resetConfigForTest();
+  });
+  afterEach(() => {
+    delete process.env.TRUST_E2E_AUTOCONFIRM;
+    resetConfigForTest();
+  });
+
+  it('refuses to boot when NODE_ENV=production and TRUST_E2E_AUTOCONFIRM=1', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.TRUST_E2E_AUTOCONFIRM = '1';
+    resetConfigForTest();
+    expect(() => getConfig()).toThrow(/TRUST_E2E_AUTOCONFIRM/);
+  });
+
+  it('refuses to boot when NODE_ENV=production and TRUST_E2E_AUTOCONFIRM=true', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.TRUST_E2E_AUTOCONFIRM = 'true';
+    resetConfigForTest();
+    expect(() => getConfig()).toThrow(/TRUST_E2E_AUTOCONFIRM/);
+  });
+
+  it('allows TRUST_E2E_AUTOCONFIRM=1 in non-production envs', () => {
+    process.env.NODE_ENV = 'test';
+    process.env.TRUST_E2E_AUTOCONFIRM = '1';
+    resetConfigForTest();
+    expect(getConfig().TRUST_E2E_AUTOCONFIRM).toBe(true);
+
+    process.env.NODE_ENV = 'development';
+    resetConfigForTest();
+    expect(getConfig().TRUST_E2E_AUTOCONFIRM).toBe(true);
+  });
+
+  it('allows NODE_ENV=production when the flag is unset or 0', () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.TRUST_E2E_AUTOCONFIRM;
+    resetConfigForTest();
+    expect(getConfig().TRUST_E2E_AUTOCONFIRM).toBe(false);
+
+    process.env.TRUST_E2E_AUTOCONFIRM = '0';
+    resetConfigForTest();
+    expect(getConfig().TRUST_E2E_AUTOCONFIRM).toBe(false);
+  });
+});
