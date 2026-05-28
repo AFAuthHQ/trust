@@ -4,15 +4,6 @@ import { Pool } from 'pg';
 import type { JWK } from 'jose';
 import { getConfig } from '../config.js';
 import { TrustError } from '../errors.js';
-
-const PG_UNIQUE_VIOLATION = '23505';
-const BINDINGS_ACTIVE_AGENT_DID_IDX = 'bindings_active_agent_did_idx';
-
-function isAgentDidUniqueViolation(err: unknown): boolean {
-  if (!err || typeof err !== 'object') return false;
-  const e = err as { code?: string; constraint?: string };
-  return e.code === PG_UNIQUE_VIOLATION && e.constraint === BINDINGS_ACTIVE_AGENT_DID_IDX;
-}
 import type {
   BindingRecord,
   CreateBindingInput,
@@ -28,6 +19,15 @@ import type {
   TokenLogEntry,
   VerificationRecord,
 } from './index.js';
+
+const PG_UNIQUE_VIOLATION = '23505';
+const BINDINGS_ACTIVE_AGENT_DID_IDX = 'bindings_active_agent_did_idx';
+
+function isAgentDidUniqueViolation(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { code?: string; constraint?: string };
+  return e.code === PG_UNIQUE_VIOLATION && e.constraint === BINDINGS_ACTIVE_AGENT_DID_IDX;
+}
 import type { VerificationMethod } from '../schemas.js';
 
 export class PgStore implements Store {
