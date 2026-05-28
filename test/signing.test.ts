@@ -41,6 +41,7 @@ describe('signing — JWT shape per AFAP-0006 §10.3.1', () => {
       agentDid: 'did:key:z6MkAgent',
       serviceDid: 'did:web:service.example',
       verification: 'email',
+      subH: 'test-sub-h-placeholder-zzzzzzzzzzzzzzzzzzzz',
     });
 
     const [headerB64] = jwt.split('.');
@@ -62,6 +63,7 @@ describe('signing — JWT shape per AFAP-0006 §10.3.1', () => {
       agentDid: 'did:key:z6MkAgent',
       serviceDid: 'did:web:service.example',
       verification: 'email',
+      subH: 'test-sub-h-placeholder-zzzzzzzzzzzzzzzzzzzz',
       ttlSeconds: 9999,
     });
     expect(exp - iat).toBe(MAX_ATTESTATION_TTL_SECONDS);
@@ -75,6 +77,7 @@ describe('signing — JWT shape per AFAP-0006 §10.3.1', () => {
       agentDid: 'did:key:z6MkAgent',
       serviceDid: 'did:web:service.example',
       verification: 'oauth',
+      subH: 'test-sub-h-placeholder-zzzzzzzzzzzzzzzzzzzz',
     });
 
     const jwks = await listPublicJwks(vault);
@@ -94,6 +97,7 @@ describe('signing — JWT shape per AFAP-0006 §10.3.1', () => {
     expect(payload.sub).toBe('did:key:z6MkAgent');
     expect(payload.aud).toBe('did:web:service.example');
     expect(payload.verification).toBe('oauth');
+    expect(payload.sub_h).toBe('test-sub-h-placeholder-zzzzzzzzzzzzzzzzzzzz');
     expect(typeof payload.iat).toBe('number');
     expect(typeof payload.exp).toBe('number');
 
@@ -133,12 +137,14 @@ describe('PgEncryptedKeyVault — at-rest encryption', () => {
       agentDid: 'did:key:z6MkA',
       serviceDid: 'did:web:s.example',
       verification: 'email',
+      subH: 'test-sub-h-placeholder-zzzzzzzzzzzzzzzzzzzz',
     });
     const r2 = await mintAttestationJwt({
       vault,
       agentDid: 'did:key:z6MkB',
       serviceDid: 'did:web:s.example',
       verification: 'email',
+      subH: 'test-sub-h-placeholder-zzzzzzzzzzzzzzzzzzzz',
     });
     expect(r1.kid).toBe(k.kid);
     expect(r2.kid).toBe(k.kid);
@@ -158,6 +164,7 @@ describe('PgEncryptedKeyVault — at-rest encryption', () => {
         agentDid: 'did:key:z6MkA',
         serviceDid: 'did:web:s.example',
         verification: 'email',
+        subH: 'test-sub-h-placeholder-zzzzzzzzzzzzzzzzzzzz',
       }),
     ).rejects.toThrow();
   });

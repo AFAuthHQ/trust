@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { Pool } from 'pg';
 import type { JWK } from 'jose';
 import { getConfig } from '../config.js';
+import { TrustError } from '../errors.js';
 import type {
   BindingRecord,
   CreateBindingInput,
@@ -18,6 +19,15 @@ import type {
   TokenLogEntry,
   VerificationRecord,
 } from './index.js';
+
+const PG_UNIQUE_VIOLATION = '23505';
+const BINDINGS_ACTIVE_AGENT_DID_IDX = 'bindings_active_agent_did_idx';
+
+function isAgentDidUniqueViolation(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { code?: string; constraint?: string };
+  return e.code === PG_UNIQUE_VIOLATION && e.constraint === BINDINGS_ACTIVE_AGENT_DID_IDX;
+}
 import type { VerificationMethod } from '../schemas.js';
 
 export class PgStore implements Store {
@@ -250,27 +260,74 @@ export class PgStore implements Store {
   // -------------------------------------------------------------------
 
   async createBinding(input: CreateBindingInput): Promise<BindingRecord> {
-    const { rows } = await this.pool.query(
-      `INSERT INTO bindings
-         (human_id, agent_did, agent_label, agent_pubkey_b64, binding_token_hash, expires_at)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       ON CONFLICT (human_id, agent_did) DO UPDATE SET
-         agent_label = EXCLUDED.agent_label,
-         agent_pubkey_b64 = EXCLUDED.agent_pubkey_b64,
-         binding_token_hash = EXCLUDED.binding_token_hash,
-         expires_at = EXCLUDED.expires_at,
-         revoked_at = NULL
-       RETURNING *`,
-      [
-        input.human_id,
-        input.agent_did,
-        input.agent_label ?? null,
-        input.agent_pubkey_b64,
-        input.binding_token_hash,
-        input.expires_at,
-      ],
-    );
-    return toBinding(rows[0]);
+    // §10.5 — at most one active binding per agent_did per attestor.
+    // Lock any existing active row inside a transaction so concurrent
+    // /v1/link/confirm calls can't both reach INSERT.
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const existing = await client.query(
+        'SELECT * FROM bindings WHERE agent_did = $1 AND revoked_at IS NULL FOR UPDATE',
+        [input.agent_did],
+      );
+
+      if (existing.rows.length > 0) {
+        const row = existing.rows[0];
+        if (row.human_id !== input.human_id) {
+          await client.query('ROLLBACK');
+          throw TrustError.agentAlreadyBound();
+        }
+        // Same human re-linking — refresh the active binding in place
+        // (rotates the binding_token and pubkey).
+        const updated = await client.query(
+          `UPDATE bindings SET
+             agent_label = $1,
+             agent_pubkey_b64 = $2,
+             binding_token_hash = $3,
+             expires_at = $4
+           WHERE id = $5 RETURNING *`,
+          [
+            input.agent_label ?? null,
+            input.agent_pubkey_b64,
+            input.binding_token_hash,
+            input.expires_at,
+            row.id,
+          ],
+        );
+        await client.query('COMMIT');
+        return toBinding(updated.rows[0]);
+      }
+
+      const inserted = await client.query(
+        `INSERT INTO bindings
+           (human_id, agent_did, agent_label, agent_pubkey_b64, binding_token_hash, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING *`,
+        [
+          input.human_id,
+          input.agent_did,
+          input.agent_label ?? null,
+          input.agent_pubkey_b64,
+          input.binding_token_hash,
+          input.expires_at,
+        ],
+      );
+      await client.query('COMMIT');
+      return toBinding(inserted.rows[0]);
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      // Defense-in-depth: if the partial unique index still fires
+      // (e.g., a concurrent commit slipped past the SELECT FOR UPDATE
+      // window via a different connection that skipped the lock),
+      // translate to the public-facing error.
+      if (isAgentDidUniqueViolation(err)) {
+        throw TrustError.agentAlreadyBound();
+      }
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 
   async getBindingByTokenHash(token_hash: string): Promise<BindingRecord | null> {
@@ -283,6 +340,14 @@ export class PgStore implements Store {
 
   async getBindingById(id: string): Promise<BindingRecord | null> {
     const { rows } = await this.pool.query('SELECT * FROM bindings WHERE id = $1', [id]);
+    return rows[0] ? toBinding(rows[0]) : null;
+  }
+
+  async findActiveBindingByAgentDid(agent_did: string): Promise<BindingRecord | null> {
+    const { rows } = await this.pool.query(
+      'SELECT * FROM bindings WHERE agent_did = $1 AND revoked_at IS NULL LIMIT 1',
+      [agent_did],
+    );
     return rows[0] ? toBinding(rows[0]) : null;
   }
 

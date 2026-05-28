@@ -3,6 +3,7 @@ import type Redis from 'ioredis';
 import { TrustError } from '../lib/errors.js';
 import type { KeyVault } from '../lib/keyvault.js';
 import { rateLimit, clientIp } from '../lib/ratelimit.js';
+import { deriveSubH, pseudonymKeyBytes } from '../lib/pseudonym.js';
 import { TokenRequest, type TokenResponse, type VerificationMethod } from '../lib/schemas.js';
 import { mintAttestationJwt } from '../lib/signing.js';
 import type { Store } from '../lib/store/index.js';
@@ -72,11 +73,14 @@ export function createTokenRoutes(deps: { store: Store; redis: Redis; vault: Key
         throw TrustError.internal('Failed to rank verifications');
       }
 
+      const subH = deriveSubH(binding.human_id, body.data.aud, pseudonymKeyBytes());
+
       const { jwt, kid, iat, exp } = await mintAttestationJwt({
         vault,
         agentDid: binding.agent_did,
         serviceDid: body.data.aud,
         verification,
+        subH,
       });
 
       // Best-effort audit + last-used touch.

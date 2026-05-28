@@ -189,6 +189,13 @@ export interface Store {
   createBinding(input: CreateBindingInput): Promise<BindingRecord>;
   getBindingByTokenHash(token_hash: string): Promise<BindingRecord | null>;
   getBindingById(id: string): Promise<BindingRecord | null>;
+  /**
+   * AFAP-0006 §10.5 — returns the (at most one) active, unrevoked
+   * binding for the agent DID, or null. Used by link-confirm to
+   * reject co-binding attempts before they reach the unique-index
+   * race in createBinding.
+   */
+  findActiveBindingByAgentDid(agent_did: string): Promise<BindingRecord | null>;
   listBindingsByHuman(human_id: string): Promise<BindingRecord[]>;
   revokeBinding(id: string, human_id: string): Promise<BindingRecord | null>;
   touchBindingLastUsed(id: string, when: Date): Promise<void>;

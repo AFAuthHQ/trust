@@ -131,15 +131,31 @@ export function createPageRoutes(deps: { store: Store; redis: Redis }): Hono {
     const reqId = typeof form.req_id === 'string' ? form.req_id : null;
     if (!reqId) throw TrustError.invalidRequest('req_id required');
 
-    const result = await confirmLinkRequest({ store, redis, human, reqId });
-
-    return c.html(
-      await layout({
-        title: 'Linked · trust.afauth.org',
-        path: '/link',
-        body: linkConfirmedPage({ callbackUrl: result.callback_url }),
-      }),
-    );
+    try {
+      const result = await confirmLinkRequest({ store, redis, human, reqId });
+      return c.html(
+        await layout({
+          title: 'Linked · trust.afauth.org',
+          path: '/link',
+          body: linkConfirmedPage({ callbackUrl: result.callback_url }),
+        }),
+      );
+    } catch (err) {
+      // Render the friendly HTML error page for known protocol errors
+      // so a browser user isn't dropped on a raw JSON envelope.
+      // Anything else propagates to the global JSON handler.
+      if (err instanceof TrustError) {
+        return c.html(
+          await layout({
+            title: 'Link not confirmed · trust.afauth.org',
+            path: '/link',
+            body: linkErrorPage({ message: err.message }),
+          }),
+          err.status as 400,
+        );
+      }
+      throw err;
+    }
   });
 
   // ------ /account --------------------------------------------------

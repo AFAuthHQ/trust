@@ -89,6 +89,11 @@ describe('POST /v1/token — §10 attestation issuance', () => {
     expect(payload.sub).toBe(agentDid);
     expect(payload.verification).toBe('email');
 
+    // §10.4 — sub_h is present, base64url, within [22,86] chars.
+    expect(payload.sub_h).toEqual(expect.stringMatching(/^[A-Za-z0-9_-]{22,86}$/));
+    expect(payload.sub_h).not.toBe(payload.sub);
+    expect(payload.sub_h).not.toBe(payload.aud);
+
     // The binding's last_used_at was bumped.
     const refreshed = await h.store.getBindingById(binding_id);
     expect(refreshed?.last_used_at).toBeTruthy();
@@ -224,5 +229,33 @@ describe('POST /v1/token — §10 attestation issuance', () => {
         audience: 'did:web:a.example',
       }),
     ).rejects.toThrow();
+  });
+
+  it('§10.4 — sub_h is pairwise per aud and stable across calls', async () => {
+    const { binding_token } = await setupLinked();
+    const mint = async (aud: string) => {
+      const r = await postJson(
+        h.app,
+        '/v1/token',
+        { aud },
+        { headers: { authorization: `Bearer ${binding_token}` } },
+      );
+      const { jwt } = (await r.json()) as { jwt: string };
+      const jwks = await listPublicJwks(h.vault);
+      const key = await importJWK(jwks.keys[0]!, ATTESTATION_JWT_ALG);
+      const { payload } = await jwtVerify(jwt, key, {
+        algorithms: [ATTESTATION_JWT_ALG],
+        issuer: ISS,
+        audience: aud,
+      });
+      return payload.sub_h as string;
+    };
+
+    const a1 = await mint('did:web:a.example');
+    const a2 = await mint('did:web:a.example');
+    const b1 = await mint('did:web:b.example');
+
+    expect(a1).toBe(a2); // stable per (binding, aud)
+    expect(a1).not.toBe(b1); // pairwise across aud
   });
 });

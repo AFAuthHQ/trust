@@ -26,6 +26,7 @@ export function setTestEnv(): void {
   process.env.TRUST_SESSION_SECRET = 'test-session-secret-must-be-at-least-32-bytes-long-xx';
   process.env.TRUST_ADMIN_SECRET = 'test-admin-secret-16';
   process.env.TRUST_KEK_BASE64 = Buffer.alloc(32, 0xab).toString('base64');
+  process.env.TRUST_PSEUDONYM_KEY_BASE64 = Buffer.alloc(32, 0xcd).toString('base64');
   process.env.PUBLIC_BASE_URL = 'http://localhost:3001';
   process.env.JWKS_PUBLIC_URL = 'http://localhost:3001/.well-known/jwks.json';
   process.env.EMAIL_PROVIDER = 'stdout';
