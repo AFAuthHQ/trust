@@ -43,7 +43,26 @@ const ConfigSchema = z.object({
     .default('https://trust.afauth.org/.well-known/jwks.json'),
 
   EMAIL_PROVIDER: z.enum(['stdout', 'resend', 'postmark']).default('stdout'),
-  EMAIL_FROM: z.string().email().default('no-reply@trust.afauth.org'),
+  /**
+   * Sender address. Accepts either:
+   *   - bare email:        `[email protected]`
+   *   - RFC 5322 name-addr: `Display Name <[email protected]>`
+   * Resend's `from` field accepts both.
+   */
+  EMAIL_FROM: z
+    .string()
+    .refine(
+      (s) => {
+        const m = s.match(/^\s*(?:[^<>]*<\s*([^>\s]+)\s*>|([^\s<>]+))\s*$/);
+        const addr = m?.[1] ?? m?.[2];
+        if (!addr) return false;
+        // Minimal email shape — exactly one @, non-empty local and
+        // domain parts with at least one dot in the domain.
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addr);
+      },
+      'EMAIL_FROM must be an email or a `Name <email>` name-addr',
+    )
+    .default('no-reply@trust.afauth.org'),
   EMAIL_API_KEY: z.string().optional(),
 });
 
