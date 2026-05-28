@@ -256,4 +256,54 @@ describe('AFAP-0006 §10.5 — one active human binding per agent DID', () => {
     const after = await h.store.findActiveBindingByAgentDid(kp.did);
     expect(after).toBeNull();
   });
+
+  // Browser /link/confirm: the form-submit path renders HTML, not JSON,
+  // so a TrustError that escapes confirmLinkRequest must come back as a
+  // styled error page rather than the raw JSON envelope a JSON client
+  // would receive at /v1/link/confirm.
+  it('POST /link/confirm renders HTML error page on agent_already_bound (no owner leak)', async () => {
+    const kp = await createAgentKeypair();
+    const alice = await h.store.upsertHuman({ primary_email: 'alice@example.com' });
+    const bob = await h.store.upsertHuman({ primary_email: 'bob@example.com' });
+    await linkAs(alice, kp.did, kp.publicKeyB64);
+
+    // Bob signs in via magic link to obtain a session cookie.
+    const { generateToken: gt, hashToken: ht } = await import('../src/lib/tokens.js');
+    const raw = gt();
+    await h.store.createMagicLink(
+      bob.primary_email,
+      ht(raw),
+      new Date(Date.now() + 15 * 60_000),
+    );
+    const signin = await h.app.request('/signin/callback', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: `token=${encodeURIComponent(raw)}`,
+    });
+    const cookie = signin.headers.get('set-cookie')!;
+    const sessHeader = cookie.split(';')[0]!; // "trust_sess=..."
+
+    // Bob starts a link for the same agent_did, then posts the confirm form.
+    const lr = await h.store.createLinkRequest({
+      agent_did: kp.did,
+      agent_pubkey_b64: kp.publicKeyB64,
+      expires_at: new Date(Date.now() + 30 * 60_000),
+    });
+    const r = await h.app.request('/link/confirm', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie: sessHeader,
+      },
+      body: `req_id=${encodeURIComponent(lr.id)}`,
+    });
+
+    expect(r.status).toBe(409);
+    expect(r.headers.get('content-type') ?? '').toMatch(/text\/html/);
+    const html = await r.text();
+    expect(html).toContain('already linked');
+    expect(html).not.toMatch(/alice/i);
+    expect(html).not.toMatch(/alice@example\.com/i);
+    expect(html).not.toContain(alice.id);
+  });
 });
