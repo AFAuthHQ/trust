@@ -157,6 +157,15 @@ export class PgStore implements Store {
     return toMagicLink(rows[0]);
   }
 
+  async peekMagicLink(token_hash: string): Promise<MagicLinkRecord | null> {
+    const { rows } = await this.pool.query(
+      `SELECT * FROM magic_links
+       WHERE token_hash = $1 AND consumed_at IS NULL AND expires_at > now()`,
+      [token_hash],
+    );
+    return rows[0] ? toMagicLink(rows[0]) : null;
+  }
+
   async consumeMagicLink(token_hash: string): Promise<MagicLinkRecord | null> {
     const { rows } = await this.pool.query(
       `UPDATE magic_links SET consumed_at = now()

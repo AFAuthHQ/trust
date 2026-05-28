@@ -142,6 +142,15 @@ export interface Store {
     expires_at: Date,
     next_path?: string,
   ): Promise<MagicLinkRecord>;
+  /**
+   * Look up a magic link by token hash WITHOUT consuming it. Returns
+   * the record if it exists, is unconsumed, and not expired; null
+   * otherwise. Used by GET /signin/callback to render the consent
+   * page without burning the token (URL pre-fetchers like Microsoft
+   * SafeLinks aggressively GET email links and would otherwise
+   * invalidate the link before the human ever sees it).
+   */
+  peekMagicLink(token_hash: string): Promise<MagicLinkRecord | null>;
   consumeMagicLink(token_hash: string): Promise<MagicLinkRecord | null>;
 
   // Link requests

@@ -9,7 +9,12 @@ import { generateToken, hashToken } from '../lib/tokens.js';
 import { sendMagicLink } from '../lib/verification/email.js';
 import { clearSessionCookie, createSessionCookie } from '../lib/auth.js';
 import { layout } from '../views/layout.js';
-import { signinPage, signinSentPage } from '../views/signin.js';
+import {
+  signinCallbackErrorPage,
+  signinCallbackPage,
+  signinPage,
+  signinSentPage,
+} from '../views/signin.js';
 
 const MAGIC_LINK_TTL_SECONDS = 15 * 60;
 
@@ -79,8 +84,52 @@ export function createAuthRoutes(deps: { store: Store; redis: Redis }): Hono {
     },
   );
 
+  // GET /signin/callback — render consent page. We do NOT consume
+  // the token here; pre-fetchers (M365 SafeLinks, Gmail scanner,
+  // corporate egress proxies) GET email URLs to scan, and would
+  // otherwise burn the link before the human ever sees it. The POST
+  // handler below is the only thing that consumes the token.
   app.get('/signin/callback', async (c) => {
     const token = c.req.query('token');
+    if (!token) {
+      return c.html(
+        await layout({
+          title: 'Link unavailable · trust.afauth.org',
+          path: '/signin/callback',
+          body: signinCallbackErrorPage({ message: 'No sign-in token supplied.' }),
+        }),
+        400,
+      );
+    }
+    const peeked = await store.peekMagicLink(hashToken(token));
+    if (!peeked) {
+      return c.html(
+        await layout({
+          title: 'Link unavailable · trust.afauth.org',
+          path: '/signin/callback',
+          body: signinCallbackErrorPage({
+            message:
+              'This sign-in link has expired or was already used. Request a new one below.',
+          }),
+        }),
+        410,
+      );
+    }
+    return c.html(
+      await layout({
+        title: 'Sign in · trust.afauth.org',
+        path: '/signin/callback',
+        body: signinCallbackPage({ email: peeked.email, token }),
+      }),
+    );
+  });
+
+  // POST /signin/callback — consumes the token atomically, sets the
+  // session cookie. Same-origin: SameSite=Lax cookie + form-action
+  // 'self' CSP prevent cross-site form submission.
+  app.post('/signin/callback', async (c) => {
+    const form = await c.req.parseBody();
+    const token = typeof form.token === 'string' ? form.token : '';
     if (!token) throw TrustError.invalidRequest('Missing token');
     const consumed = await store.consumeMagicLink(hashToken(token));
     if (!consumed) throw TrustError.gone('Magic link expired or already used');
@@ -89,9 +138,10 @@ export function createAuthRoutes(deps: { store: Store; redis: Redis }): Hono {
     await store.recordVerification(human.id, 'email', 'magic-link');
     await createSessionCookie(c, store, human);
 
-    const next = consumed.next_path && consumed.next_path.startsWith('/')
-      ? consumed.next_path
-      : '/account';
+    const next =
+      consumed.next_path && consumed.next_path.startsWith('/')
+        ? consumed.next_path
+        : '/account';
     return c.redirect(next);
   });
 

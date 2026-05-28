@@ -137,6 +137,19 @@ export class MemoryStore implements Store {
     this.magicLinks.set(m.id, m);
     return m;
   }
+  async peekMagicLink(token_hash: string) {
+    for (const m of this.magicLinks.values()) {
+      if (
+        m.token_hash === token_hash &&
+        m.consumed_at === null &&
+        m.expires_at.getTime() > Date.now()
+      ) {
+        return m;
+      }
+    }
+    return null;
+  }
+
   async consumeMagicLink(token_hash: string) {
     for (const m of this.magicLinks.values()) {
       if (
