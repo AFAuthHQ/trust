@@ -29,6 +29,24 @@ const ConfigSchema = z.object({
     }, 'TRUST_KEK_BASE64 must decode to exactly 32 bytes (use `openssl rand -base64 32`)'),
 
   /**
+   * Base64 of a 32-byte HMAC key used to derive the §10.4 `sub_h`
+   * pairwise human pseudonym. Generated once and held for the
+   * lifetime of the deployment; rotating invalidates every
+   * downstream service's per-`sub_h` dedup state and SHOULD be
+   * treated as incident response, not routine hygiene (§12.9).
+   * Generate: `openssl rand -base64 32`.
+   */
+  TRUST_PSEUDONYM_KEY_BASE64: z
+    .string()
+    .refine((s) => {
+      try {
+        return Buffer.from(s, 'base64').length === 32;
+      } catch {
+        return false;
+      }
+    }, 'TRUST_PSEUDONYM_KEY_BASE64 must decode to exactly 32 bytes (use `openssl rand -base64 32`)'),
+
+  /**
    * Cron schedule for scheduled key rotation. Defaults to monthly at
    * 03:00 UTC ("0 3 1 * *"). Set to an empty string to disable the
    * cron entirely; operators can still trigger rotation via
