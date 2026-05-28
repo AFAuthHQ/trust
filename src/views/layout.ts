@@ -22,27 +22,71 @@ const STYLE = `
     font-size: 17px;
   }
   header.site {
-    border-bottom: 1px solid var(--line);
-    background: rgba(245, 239, 228, 0.85);
-    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(20, 16, 8, 0.10);
+    background: rgba(245, 239, 228, 0.78);
+    backdrop-filter: blur(16px) saturate(120%);
+    -webkit-backdrop-filter: blur(16px) saturate(120%);
     position: sticky;
     top: 0;
-    z-index: 10;
+    z-index: 30;
   }
   header.site nav {
-    max-width: 720px;
+    max-width: 1248px;
     margin: 0 auto;
     padding: 14px 24px;
     display: flex;
-    gap: 20px;
-    align-items: baseline;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 13px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
   }
-  header.site nav strong { color: var(--accent); font-weight: 600; }
-  header.site nav a { color: var(--fg); text-decoration: none; }
-  header.site nav a:hover { color: var(--accent); }
-  header.site nav .spacer { flex: 1; }
+  header.site .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--fg);
+    text-decoration: none;
+  }
+  header.site .brand svg { display: block; height: 24px; width: 24px; }
+  header.site .brand .wordmark {
+    font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    color: var(--fg);
+  }
+  header.site .brand .surface {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--muted);
+    padding-left: 10px;
+    margin-left: 4px;
+    border-left: 1px solid rgba(20, 16, 8, 0.18);
+  }
+  header.site .brand:hover .wordmark,
+  header.site .brand:hover .surface { color: var(--accent); }
+  header.site .links {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+  }
+  header.site .links a {
+    padding: 6px 12px;
+    color: #3F362D;
+    text-decoration: none;
+  }
+  header.site .links a:hover { color: var(--accent); }
+  header.site .links a.ext { display: inline-flex; align-items: center; gap: 6px; }
+  header.site .links a.ext svg { height: 14px; width: 14px; }
+  @media (max-width: 640px) {
+    header.site .links a.hide-sm { display: none; }
+    header.site .brand .surface { display: none; }
+  }
   main {
     max-width: 720px;
     margin: 0 auto;
@@ -198,13 +242,26 @@ export function layout(opts: LayoutOpts): HtmlEscapedString | Promise<HtmlEscape
 </head>
 <body>
 <header class="site"><nav>
-  <strong>trust.afauth.org</strong>
-  <a href="/account">Account</a>
-  <a href="/operator">Operator</a>
-  <a href="/policy">Policy</a>
-  <span class="spacer"></span>
-  <a href="https://afauth.org" rel="noopener">afauth.org &#8599;</a>
-  <a href="https://github.com/AFAuthHQ/spec/blob/main/proposals/0006-afauth-trust-attestor.md" target="_blank" rel="noopener">AFAP-0006 &#8599;</a>
+  <a class="brand" href="/" aria-label="AFAuth trust attestor — home">
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <path d="M14 46 L32 14 L50 46 Z" fill="none" stroke="#B83227" stroke-width="5" stroke-linejoin="round"/>
+      <circle cx="32" cy="36" r="3.5" fill="#B83227"/>
+    </svg>
+    <span class="wordmark">AFAuth</span>
+    <span class="surface">Trust</span>
+  </a>
+  <div class="links">
+    <a class="hide-sm" href="/account">Account</a>
+    <a class="hide-sm" href="/operator">Operator</a>
+    <a class="hide-sm" href="/policy">Policy</a>
+    <a href="https://afauth.org" rel="noopener">afauth.org</a>
+    <a class="ext" href="https://github.com/AFAuthHQ" target="_blank" rel="noopener" aria-label="AFAuth on GitHub">
+      <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+      </svg>
+      <span class="hide-sm">GitHub</span>
+    </a>
+  </div>
 </nav></header>
 <main>${opts.body}</main>
 <footer class="site">
