@@ -17,6 +17,7 @@ const GOOGLE_G_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24
 </svg>`;
 
 const SIGNIN_STYLE = `
+  .signin-wrap { max-width: 420px; }
   .signin-google {
     display: inline-flex;
     align-items: center;
@@ -37,26 +38,19 @@ const SIGNIN_STYLE = `
   }
   .signin-google:hover { background: #f8f9fa; color: #1f1f1f; }
   .signin-google svg { flex: none; }
-  .signin-other {
-    margin-top: 22px;
-    max-width: 420px;
-  }
-  .signin-other > summary {
-    list-style: none;
-    cursor: pointer;
-    color: var(--muted);
-    font-size: 14px;
-    padding: 8px 0;
-    user-select: none;
-  }
-  .signin-other > summary::-webkit-details-marker { display: none; }
-  .signin-other > summary:hover { color: var(--accent); }
-  .signin-other[open] > summary { margin-bottom: 6px; }
   .signin-divider {
-    border: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 22px 0;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .signin-divider::before,
+  .signin-divider::after {
+    content: '';
+    flex: 1;
     border-top: 1px solid var(--line);
-    margin: 22px 0 0;
-    max-width: 420px;
   }
 `;
 
@@ -65,15 +59,13 @@ export function signinPage(opts: { next?: string; googleEnabled?: boolean }) {
     ? `/auth/google/start?next=${encodeURIComponent(opts.next)}`
     : '/auth/google/start';
 
-  // When Google is disabled, the email form is the only sign-in path
-  // and is rendered without the disclosure wrapper.
   if (!opts.googleEnabled) {
     return html`
       <h1>Sign in</h1>
       <p class="lede">
         Enter your email; we'll send you a one-time sign-in link.
       </p>
-      ${emailForm(opts.next)}
+      ${emailForm(opts.next, { primary: true })}
       <p style="margin-top: 28px; font-size: 13px; color: var(--muted);">
         Sign-in with Google ships when the operator configures OAuth
         credentials. Payment-card verification ships in a future
@@ -82,32 +74,32 @@ export function signinPage(opts: { next?: string; googleEnabled?: boolean }) {
     `;
   }
 
+  // Both options visible. Google is visually dominant (large, branded
+  // button at the top); email lives below an "or" divider with an
+  // outlined send button so the hierarchy is clear without hiding
+  // either path. Industry consensus among dev-tools auth pages is
+  // "both visible, ranked by preference" — hiding email costs the
+  // returning magic-link user a click and the privacy-conscious user
+  // confidence that they can avoid Google entirely.
   return html`
     <style>${raw(SIGNIN_STYLE)}</style>
     <h1>Sign in</h1>
     <p class="lede">Sign in to your AFAuth account.</p>
-    <div style="max-width: 420px;">
+    <div class="signin-wrap">
       <a class="signin-google" href="${googleHref}">
         ${raw(GOOGLE_G_SVG)}
         <span>Continue with Google</span>
       </a>
+      <div class="signin-divider"><span>or</span></div>
+      ${emailForm(opts.next, { primary: false })}
     </div>
-    <hr class="signin-divider">
-    <details class="signin-other">
-      <summary>Sign in with email instead</summary>
-      <p style="font-size: 13px; color: var(--muted); margin-top: 4px;">
-        We'll send a one-time sign-in link. Use this if you don't want
-        to link a Google account.
-      </p>
-      ${emailForm(opts.next)}
-    </details>
     <p style="margin-top: 28px; font-size: 13px; color: var(--muted);">
       Payment-card verification ships in a future revision.
     </p>
   `;
 }
 
-function emailForm(next: string | undefined) {
+function emailForm(next: string | undefined, opts: { primary: boolean }) {
   return html`
     <form class="stack" method="post" action="/signin">
       ${next ? html`<input type="hidden" name="next" value="${next}">` : ''}
@@ -116,7 +108,9 @@ function emailForm(next: string | undefined) {
         <input type="email" name="email" required autocomplete="email">
       </label>
       <div>
-        <button type="submit" class="btn btn-primary">Send sign-in link</button>
+        <button type="submit" class="btn ${opts.primary ? 'btn-primary' : ''}">
+          Send sign-in link
+        </button>
       </div>
     </form>
   `;
