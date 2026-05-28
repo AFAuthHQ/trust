@@ -96,9 +96,9 @@ export function linkConfirmedPage(opts: { callbackUrl: string | null }) {
             </a>
           </p>
           <p style="font-size: 13px; color: var(--muted);">
-            The agent has already been notified — closing this tab
-            is fine too.
+            Notifying the agent… you can close this tab.
           </p>
+          <script src="/link-callback.js" data-callback="${opts.callbackUrl}" defer></script>
         `
       : html`<p>You can close this tab.</p>`}
   `;

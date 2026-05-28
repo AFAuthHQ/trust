@@ -105,6 +105,7 @@ export function createApp(deps: AppDeps): Hono {
   // self-contained (and so CSP can stay tight: img-src 'self' data:).
   app.use('/favicon.svg', serveStatic({ path: './public/favicon.svg' }));
   app.use('/inbox-poll.js', serveStatic({ path: './public/inbox-poll.js' }));
+  app.use('/link-callback.js', serveStatic({ path: './public/link-callback.js' }));
 
   app.route('/', healthRoutes);
   app.route('/', createWellKnownRoutes(deps));
