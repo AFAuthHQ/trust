@@ -45,4 +45,14 @@ describe('security response headers', () => {
     // level, before they hit a real browser.
     expect(csp).toMatch(/script-src 'self'(?!\s*'unsafe-inline')/);
   });
+
+  it('CSP img-src is same-origin (no cross-origin image hosts)', async () => {
+    const r = await h.app.request('/');
+    const csp = r.headers.get('content-security-policy') ?? '';
+    // After the favicon was brought in-house under /favicon.svg, the
+    // CSP no longer needs to allow https://afauth.org. Catching any
+    // re-introduction of a cross-origin image host before it ships.
+    expect(csp).toContain("img-src 'self' data:");
+    expect(csp).not.toContain('afauth.org');
+  });
 });

@@ -15,6 +15,7 @@ RUN pnpm install --frozen-lockfile=false --prod
 COPY --from=builder /app/dist ./dist
 COPY migrations ./migrations
 COPY scripts ./scripts
+COPY public ./public
 ENV NODE_ENV=production
 EXPOSE 3000
 CMD ["node", "dist/server.js"]

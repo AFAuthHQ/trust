@@ -193,7 +193,7 @@ export function layout(opts: LayoutOpts): HtmlEscapedString | Promise<HtmlEscape
 <meta property="og:title" content="${opts.title}">
 <meta property="og:description" content="${description}">
 <meta property="og:url" content="${canonical}">
-<link rel="icon" type="image/svg+xml" href="https://afauth.org/favicon.svg">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>${raw(STYLE)}</style>
 </head>
 <body>

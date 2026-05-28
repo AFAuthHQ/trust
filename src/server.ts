@@ -1,4 +1,5 @@
 import { serve } from '@hono/node-server';
+import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
 import type Redis from 'ioredis';
 import { getConfig } from './lib/config.js';
@@ -71,7 +72,7 @@ export function createApp(deps: AppDeps): Hono {
         "default-src 'self'",
         "script-src 'self'",
         "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' https://afauth.org data:",
+        "img-src 'self' data:",
         "connect-src 'self'",
         "form-action 'self'",
         "frame-ancestors 'none'",
@@ -94,6 +95,11 @@ export function createApp(deps: AppDeps): Hono {
   app.notFound((c) =>
     c.json({ error: { code: 'not_found', message: 'Not found' } }, 404),
   );
+
+  // Static assets out of trust/public — favicon + any future public
+  // bytes that should be served same-origin so the page is fully
+  // self-contained (and so CSP can stay tight: img-src 'self' data:).
+  app.use('/favicon.svg', serveStatic({ path: './public/favicon.svg' }));
 
   app.route('/', healthRoutes);
   app.route('/', createWellKnownRoutes(deps));
