@@ -22,7 +22,6 @@ export function accountPage(opts: {
   googleEnabled?: boolean;
 }) {
   const { human, verifications, bindings, recentTokens, googleEnabled } = opts;
-  const hasEmail = verifications.some((v) => v.method === 'email');
   const googleVerification = verifications.find(
     (v) => v.method === 'oauth' && v.provider === 'google',
   );
@@ -40,22 +39,16 @@ export function accountPage(opts: {
 
     <h2>Verifications</h2>
     <div class="card">
-      ${verifications
-        .filter((v) => v.method === 'email')
-        .map(
-          (v) => html`
-            <div class="card-row">
-              <div>
-                <strong>Email</strong>
-                <span class="pill pill-ok">verified</span>
-                <div class="meta">${human.primary_email}</div>
-                <div class="meta">since ${v.verified_at.toISOString().slice(0, 10)}</div>
-              </div>
-            </div>
-          `,
-        )}
-      ${!hasEmail
-        ? html`
+      ${(() => {
+        // Collapse all email rows into one card — the email address is
+        // a property of the human, not the verification, so the
+        // (human, email) pair is the same regardless of how many
+        // providers verified it (magic-link, google-verified, etc.).
+        // Show the earliest verified_at so the date doesn't bounce as
+        // new providers attest the same email.
+        const emailVerifs = verifications.filter((v) => v.method === 'email');
+        if (emailVerifs.length === 0) {
+          return html`
             <div class="card-row">
               <div>
                 <strong>Email</strong>
@@ -63,8 +56,22 @@ export function accountPage(opts: {
               </div>
               <a href="/signin" class="btn">Verify</a>
             </div>
-          `
-        : ''}
+          `;
+        }
+        const earliest = emailVerifs.reduce((a, b) =>
+          a.verified_at.getTime() < b.verified_at.getTime() ? a : b,
+        );
+        return html`
+          <div class="card-row">
+            <div>
+              <strong>Email</strong>
+              <span class="pill pill-ok">verified</span>
+              <div class="meta">${human.primary_email}</div>
+              <div class="meta">since ${earliest.verified_at.toISOString().slice(0, 10)}</div>
+            </div>
+          </div>
+        `;
+      })()}
     </div>
 
     <div class="card">

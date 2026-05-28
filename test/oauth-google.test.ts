@@ -200,6 +200,37 @@ describe('GET /auth/google/callback — sign-in / sign-up branches', () => {
     expect(oauth.external_subject).toBe('google-sub-c');
   });
 
+  it('Case C with prior magic-link verification: does NOT add a redundant email row', async () => {
+    const google = await makeFakeGoogle();
+    const h = await freshHarness(google);
+    // Pre-existing human who already used magic-link.
+    const existing = await h.store.upsertHuman({ primary_email: 'priormagic@example.com' });
+    await h.store.recordVerification(existing.id, 'email', 'magic-link');
+
+    const start = await h.app.request('/auth/google/start', { redirect: 'manual' });
+    const url = new URL(start.headers.get('location')!);
+    const idToken = await google.mintIdToken({
+      sub: 'google-sub-c-prior',
+      email: 'priormagic@example.com',
+      email_verified: true,
+      nonce: url.searchParams.get('nonce')!,
+    });
+    google.setNextTokenResponse(idToken);
+
+    const r = await h.app.request(
+      `/auth/google/callback?code=fake&state=${url.searchParams.get('state')}`,
+      { redirect: 'manual' },
+    );
+    expect(r.status).toBe(302);
+
+    const vs = await h.store.listVerifications(existing.id);
+    // Exactly two rows: the prior magic-link AND the new oauth. NOT a
+    // second email row.
+    expect(vs.filter((v) => v.method === 'email')).toHaveLength(1);
+    expect(vs.find((v) => v.method === 'email')!.provider).toBe('magic-link');
+    expect(vs.filter((v) => v.method === 'oauth')).toHaveLength(1);
+  });
+
   it('Case A — sign-in: returning sub, no session → logs in as the existing human', async () => {
     const google = await makeFakeGoogle();
     const h = await freshHarness(google);

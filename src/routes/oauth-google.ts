@@ -261,11 +261,16 @@ async function signUpFlow(
 ): Promise<Response> {
   const human = await store.upsertHuman({ primary_email: identity.email });
   await store.recordVerification(human.id, 'oauth', PROVIDER, identity.subject);
-  // Google has proven control of this email. Record an email
-  // verification too so the human can later sign in via magic link
-  // without having to re-prove email separately, and so token
-  // issuance has a fallback verification method if oauth is revoked.
-  await store.recordVerification(human.id, 'email', 'google-verified');
+  // Google has proven control of this email. If the human has no
+  // existing email verification on file, record one so token issuance
+  // has a fallback `verification: 'email'` claim when oauth is later
+  // revoked. Skip if they already have ANY email verification — adding
+  // a redundant row would just clutter the account view (the picker
+  // only cares about method, not provider).
+  const existing = await store.listVerifications(human.id);
+  if (!existing.some((v) => v.method === 'email')) {
+    await store.recordVerification(human.id, 'email', 'google-verified');
+  }
   await createSessionCookie(c, store, human);
   return c.redirect(pickNext(next, '/account'));
 }
