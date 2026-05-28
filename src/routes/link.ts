@@ -113,6 +113,45 @@ export function createLinkRoutes(deps: { store: Store; redis: Redis }): Hono {
     });
   });
 
+  // ------ POST /v1/link/confirm-e2e (test-mode only) ---------------
+  //
+  // Gated behind TRUST_E2E_AUTOCONFIRM=1. 404s in any deployment
+  // where the flag is unset. See `src/lib/config.ts` for the
+  // rationale; see `spec/harness/e2e/` for the consumer.
+
+  app.post('/confirm-e2e', async (c) => {
+    const cfg = getConfig();
+    if (!cfg.TRUST_E2E_AUTOCONFIRM) {
+      return c.json(
+        { error: { code: 'not_found', message: 'Not found' } },
+        404,
+      );
+    }
+
+    const body = await c.req.json().catch(() => ({}));
+    const reqId = typeof body?.req_id === 'string' ? body.req_id : null;
+    const email = typeof body?.email === 'string' ? body.email : null;
+    if (!reqId || !email) {
+      throw TrustError.invalidRequest('req_id and email required');
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw TrustError.invalidRequest('email must be a well-formed address');
+    }
+
+    const human = await store.upsertHuman({ primary_email: email });
+    // Mark the human verified so they can later receive an
+    // afauth-trust attestation. In the real flow this happens via
+    // magic-link or OAuth; in test mode we assert it directly.
+    await store.recordVerification(human.id, 'email', 'e2e-autoconfirm');
+
+    const result = await confirmLinkRequest({ store, redis, human, reqId });
+    return c.json({
+      ok: true,
+      binding_id: result.binding_id,
+      callback_url: result.callback_url,
+    });
+  });
+
   // ------ POST /v1/link/poll (agent → binding token) ---------------
 
   app.post(

@@ -60,6 +60,24 @@ const ConfigSchema = z.object({
     .url()
     .default('https://trust.afauth.org/.well-known/jwks.json'),
 
+  /**
+   * E2E-test escape hatch. When set to `1` or `true`, enables
+   * `POST /v1/link/confirm-e2e` — an unauthenticated endpoint that
+   * auto-confirms a pending link request for a synthetic human
+   * identified only by email. Used exclusively by
+   * `spec/harness/e2e/` to drive scenarios without a Playwright
+   * browser harness or magic-link round-trip.
+   *
+   * MUST be unset (or `0`/`false`) in production. The endpoint is
+   * a controlled bypass of §10's two-step verify ceremony; with
+   * it open, anyone can mint a binding for any agent_did against
+   * any email.
+   */
+  TRUST_E2E_AUTOCONFIRM: z
+    .string()
+    .default('')
+    .transform((v) => v === '1' || v === 'true'),
+
   EMAIL_PROVIDER: z.enum(['stdout', 'resend', 'postmark']).default('stdout'),
   /**
    * Sender address. Accepts either:
