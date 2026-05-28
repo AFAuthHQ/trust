@@ -13,6 +13,13 @@ export interface VerificationRecord {
   human_id: string;
   method: VerificationMethod;
   provider: string;
+  /**
+   * Stable upstream identifier (e.g. Google ID-token "sub" claim) when
+   * the verification is an external OAuth identity; null for
+   * provider-less methods like 'email'. Unique per (provider, subject)
+   * to stop a second human claiming an already-linked OAuth account.
+   */
+  external_subject: string | null;
   verified_at: Date;
   revoked_at: Date | null;
 }
@@ -127,8 +134,24 @@ export interface Store {
     human_id: string,
     method: VerificationMethod,
     provider: string,
+    external_subject?: string,
   ): Promise<VerificationRecord>;
   listVerifications(human_id: string): Promise<VerificationRecord[]>;
+  /**
+   * Look up a verification by its upstream identity. Used during OAuth
+   * callback to decide whether a Google account already maps to a
+   * known human (sign-in) or is fresh (sign-up / link). Ignores the
+   * email — `sub` is the only stable identifier.
+   */
+  findVerificationByExternalSubject(
+    provider: string,
+    external_subject: string,
+  ): Promise<VerificationRecord | null>;
+  revokeVerification(
+    human_id: string,
+    method: VerificationMethod,
+    provider: string,
+  ): Promise<void>;
 
   // Sessions
   createSession(human_id: string, token_hash: string, expires_at: Date): Promise<SessionRecord>;

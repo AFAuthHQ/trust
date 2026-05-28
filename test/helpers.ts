@@ -10,6 +10,7 @@ import {
 import { createApp } from '../src/server.js';
 import { MemoryStore } from '../src/lib/store/memory.js';
 import { PgEncryptedKeyVault, type KeyVault } from '../src/lib/keyvault.js';
+import type { GoogleOauthDeps } from '../src/lib/oauth/google.js';
 import type { Store } from '../src/lib/store/index.js';
 
 /**
@@ -42,14 +43,21 @@ export interface TestHarness {
   vault: KeyVault;
 }
 
-export async function createTestHarness(): Promise<TestHarness> {
+export async function createTestHarness(
+  opts: { googleOauthDeps?: GoogleOauthDeps } = {},
+): Promise<TestHarness> {
   setTestEnv();
   const store = new MemoryStore();
   const redis = new (RedisMock as unknown as new () => Redis)();
   const kek = Buffer.from(process.env.TRUST_KEK_BASE64!, 'base64');
   const vault = new PgEncryptedKeyVault(store, kek);
   await vault.ensureActiveKey();
-  const app = createApp({ store, redis, vault });
+  const app = createApp({
+    store,
+    redis,
+    vault,
+    googleOauthDeps: opts.googleOauthDeps,
+  });
   return { app, store, redis, vault };
 }
 

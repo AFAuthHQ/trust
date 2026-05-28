@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type Redis from 'ioredis';
-import { getConfig } from '../lib/config.js';
+import { getConfig, getGoogleOauthConfig } from '../lib/config.js';
 import { TrustError } from '../lib/errors.js';
 import type { Store } from '../lib/store/index.js';
 import { verifyLinkRequest } from '../lib/signing.js';
@@ -147,7 +147,13 @@ export function createPageRoutes(deps: { store: Store; redis: Redis }): Hono {
       await layout({
         title: 'Account · trust.afauth.org',
         path: '/account',
-        body: accountPage({ human, verifications, bindings, recentTokens }),
+        body: accountPage({
+          human,
+          verifications,
+          bindings,
+          recentTokens,
+          googleEnabled: !!getGoogleOauthConfig(),
+        }),
       }),
     );
   });

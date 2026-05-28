@@ -90,13 +90,17 @@ export class PgStore implements Store {
     human_id: string,
     method: VerificationMethod,
     provider: string,
+    external_subject?: string,
   ): Promise<VerificationRecord> {
     const { rows } = await this.pool.query(
-      `INSERT INTO verifications (human_id, method, provider) VALUES ($1, $2, $3)
+      `INSERT INTO verifications (human_id, method, provider, external_subject)
+         VALUES ($1, $2, $3, $4)
        ON CONFLICT (human_id, method, provider) DO UPDATE
-         SET verified_at = now(), revoked_at = NULL
+         SET verified_at = now(),
+             revoked_at = NULL,
+             external_subject = COALESCE(EXCLUDED.external_subject, verifications.external_subject)
        RETURNING *`,
-      [human_id, method, provider],
+      [human_id, method, provider, external_subject ?? null],
     );
     return toVerification(rows[0]);
   }
@@ -107,6 +111,30 @@ export class PgStore implements Store {
       [human_id],
     );
     return rows.map(toVerification);
+  }
+
+  async findVerificationByExternalSubject(
+    provider: string,
+    external_subject: string,
+  ): Promise<VerificationRecord | null> {
+    const { rows } = await this.pool.query(
+      `SELECT * FROM verifications
+       WHERE provider = $1 AND external_subject = $2 AND revoked_at IS NULL`,
+      [provider, external_subject],
+    );
+    return rows[0] ? toVerification(rows[0]) : null;
+  }
+
+  async revokeVerification(
+    human_id: string,
+    method: VerificationMethod,
+    provider: string,
+  ): Promise<void> {
+    await this.pool.query(
+      `UPDATE verifications SET revoked_at = now()
+       WHERE human_id = $1 AND method = $2 AND provider = $3 AND revoked_at IS NULL`,
+      [human_id, method, provider],
+    );
   }
 
   // -------------------------------------------------------------------
@@ -377,6 +405,7 @@ function toVerification(r: any): VerificationRecord {
     human_id: r.human_id,
     method: r.method,
     provider: r.provider,
+    external_subject: r.external_subject ?? null,
     verified_at: r.verified_at,
     revoked_at: r.revoked_at,
   };

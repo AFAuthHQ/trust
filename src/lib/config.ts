@@ -64,6 +64,16 @@ const ConfigSchema = z.object({
     )
     .default('no-reply@trust.afauth.org'),
   EMAIL_API_KEY: z.string().optional(),
+
+  /**
+   * Google OAuth credentials. Both are required to enable the
+   * "Continue with Google" sign-in option; if either is missing the
+   * routes 404 and the UI hides itself. Set in Google Cloud Console →
+   * APIs & Services → Credentials → "OAuth 2.0 Client IDs". The
+   * registered redirect URI must be `{PUBLIC_BASE_URL}/auth/google/callback`.
+   */
+  GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
+  GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
@@ -86,4 +96,20 @@ export function getConfig(): Config {
 /** Test-only: reset the cached config so env mutations take effect. */
 export function resetConfigForTest(): void {
   cached = undefined;
+}
+
+/**
+ * Returns the Google OAuth credentials iff both env vars are set.
+ * Routes and UI use this as the feature gate.
+ */
+export function getGoogleOauthConfig():
+  | { clientId: string; clientSecret: string; redirectUri: string }
+  | null {
+  const cfg = getConfig();
+  if (!cfg.GOOGLE_OAUTH_CLIENT_ID || !cfg.GOOGLE_OAUTH_CLIENT_SECRET) return null;
+  return {
+    clientId: cfg.GOOGLE_OAUTH_CLIENT_ID,
+    clientSecret: cfg.GOOGLE_OAUTH_CLIENT_SECRET,
+    redirectUri: `${cfg.PUBLIC_BASE_URL.replace(/\/$/, '')}/auth/google/callback`,
+  };
 }

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type Redis from 'ioredis';
 import { z } from 'zod';
-import { getConfig } from '../lib/config.js';
+import { getConfig, getGoogleOauthConfig } from '../lib/config.js';
 import { TrustError } from '../lib/errors.js';
 import { rateLimit, clientIp } from '../lib/ratelimit.js';
 import type { Store } from '../lib/store/index.js';
@@ -29,11 +29,12 @@ export function createAuthRoutes(deps: { store: Store; redis: Redis }): Hono {
 
   app.get('/signin', async (c) => {
     const next = c.req.query('next');
+    const googleEnabled = !!getGoogleOauthConfig();
     return c.html(
       await layout({
         title: 'Sign in · trust.afauth.org',
         path: '/signin',
-        body: signinPage({ next }),
+        body: signinPage({ next, googleEnabled }),
       }),
     );
   });
