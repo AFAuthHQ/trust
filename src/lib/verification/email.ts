@@ -103,16 +103,18 @@ async function sendViaResend(args: {
 function renderMagicLinkHtml(link: string): string {
   // Plain inline-styled HTML — no external assets, no images, no
   // tracking pixel. Renders consistently across Gmail, Apple Mail,
-  // Outlook.com.
+  // Outlook.com. Neutral ink palette on white — auth emails should
+  // read calm, not alarming (red == security-warning in most users'
+  // mental models, exactly the tone we want to avoid).
   return `<!doctype html>
 <html lang="en">
-<body style="margin:0;padding:32px 16px;font-family:-apple-system,Segoe UI,sans-serif;background:#f5efe4;color:#1c1816;">
-  <div style="max-width:480px;margin:0 auto;background:#ffffff;border:1px solid #d8cfc3;border-radius:6px;padding:32px;">
-    <h1 style="margin:0 0 16px;font-size:22px;color:#B83227;">Sign in to AFAuth</h1>
+<body style="margin:0;padding:32px 16px;font-family:-apple-system,Segoe UI,sans-serif;background:#ffffff;color:#1c1816;">
+  <div style="max-width:480px;margin:0 auto;background:#ffffff;border:1px solid #e5e0d6;border-radius:6px;padding:32px;">
+    <h1 style="margin:0 0 16px;font-size:22px;color:#1c1816;">Sign in to AFAuth</h1>
     <p style="margin:0 0 24px;">Click below to sign in. The link expires in 15 minutes.</p>
     <p style="margin:0 0 32px;">
       <a href="${escapeHtml(link)}"
-         style="display:inline-block;padding:12px 22px;background:#B83227;color:#fff;text-decoration:none;border-radius:4px;font-weight:600;">
+         style="display:inline-block;padding:12px 22px;background:#1c1816;color:#ffffff;text-decoration:none;border-radius:4px;font-weight:600;">
         Sign in
       </a>
     </p>
