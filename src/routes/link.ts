@@ -143,7 +143,15 @@ export function createLinkRoutes(deps: { store: Store; redis: Redis }): Hono {
       if (!ok) throw TrustError.invalidSignature();
 
       if (lr.state === 'pending') {
-        return c.json({ state: 'pending' as const });
+        // `phase` lets the agent show a tighter waiting message
+        // ("Waiting for you to sign in…" vs "Waiting for you to
+        // confirm…"). Derived from the per-request viewed marker that
+        // /link sets on first browser render.
+        const viewed = await redis.exists(`link-viewed:${lr.id}`);
+        return c.json({
+          state: 'pending' as const,
+          phase: viewed ? ('awaiting_confirm' as const) : ('awaiting_signin' as const),
+        });
       }
       if (lr.state !== 'confirmed') {
         throw TrustError.gone(`Link request is ${lr.state}`);

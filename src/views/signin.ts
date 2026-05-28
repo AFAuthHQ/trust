@@ -54,16 +54,34 @@ const SIGNIN_STYLE = `
   }
 `;
 
-export function signinPage(opts: { next?: string; googleEnabled?: boolean }) {
+export function signinPage(opts: {
+  next?: string;
+  googleEnabled?: boolean;
+  /**
+   * Optional entry-context hint. When the user arrived from /link?req=...
+   * (an agent's deep link), copy is rewritten so first-time visitors
+   * understand they're about to authorise an agent and that we'll
+   * create their AFAuth account if they don't already have one.
+   */
+  context?: 'link';
+}) {
   const googleHref = opts.next
     ? `/auth/google/start?next=${encodeURIComponent(opts.next)}`
     : '/auth/google/start';
 
+  const isLink = opts.context === 'link';
+  const headline = isLink ? 'Sign in to link your agent' : 'Sign in';
+  const lede = isLink
+    ? "We'll create your AFAuth account if this is your first time."
+    : 'Sign in to your AFAuth account.';
+
   if (!opts.googleEnabled) {
     return html`
-      <h1>Sign in</h1>
+      <h1>${headline}</h1>
       <p class="lede">
-        Enter your email; we'll send you a one-time sign-in link.
+        ${isLink
+          ? html`${lede} Enter your email; we'll send you a one-time sign-in link.`
+          : html`Enter your email; we'll send you a one-time sign-in link.`}
       </p>
       ${emailForm(opts.next, { primary: true })}
       <p style="margin-top: 28px; font-size: 13px; color: var(--muted);">
@@ -83,8 +101,8 @@ export function signinPage(opts: { next?: string; googleEnabled?: boolean }) {
   // confidence that they can avoid Google entirely.
   return html`
     <style>${raw(SIGNIN_STYLE)}</style>
-    <h1>Sign in</h1>
-    <p class="lede">Sign in to your AFAuth account.</p>
+    <h1>${headline}</h1>
+    <p class="lede">${lede}</p>
     <div class="signin-wrap">
       <a class="signin-google" href="${googleHref}">
         ${raw(GOOGLE_G_SVG)}
@@ -116,13 +134,26 @@ function emailForm(next: string | undefined, opts: { primary: boolean }) {
   `;
 }
 
-export function signinSentPage(opts: { email: string }) {
+export function signinSentPage(opts: { email: string; next?: string }) {
+  // The magic-link click opens in a *new* browser tab (mail clients
+  // and OS link handlers default to that). The original "check your
+  // inbox" tab is then orphaned, sometimes confusing users who flip
+  // back to it. We load a tiny same-origin script that polls the
+  // (no-PII) session endpoint and self-redirects once the click in
+  // the other tab creates a session — so this tab continues without
+  // the user having to think about it. CSP `script-src 'self'` rules
+  // out inline JS, hence the static /inbox-poll.js + data-next attr.
+  const nextSafe = opts.next && opts.next.startsWith('/') && !opts.next.startsWith('//')
+    ? opts.next
+    : '/account';
   return html`
     <h1>Check your inbox</h1>
     <p class="lede">
       We sent a sign-in link to <strong>${opts.email}</strong>.
     </p>
-    <p>The link expires in 15 minutes. You can close this tab.</p>
+    <p>The link expires in 15 minutes. You can close this tab — once
+      you click the email link, this page will continue automatically.</p>
+    <script src="/inbox-poll.js" data-next="${nextSafe}" defer></script>
   `;
 }
 

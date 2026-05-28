@@ -59,8 +59,20 @@ export const LinkPollRequest = z.object({
 });
 export type LinkPollRequest = z.infer<typeof LinkPollRequest>;
 
+/**
+ * `phase` is a hint for the CLI's waiting message, not a state machine:
+ *   awaiting_signin  — nobody has loaded the /link page in a browser yet
+ *   awaiting_confirm — the page was loaded and the human is presumably
+ *                       partway through sign-in / confirmation
+ *
+ * Derived from a Redis "viewed" marker the /link page sets on first
+ * render — it doesn't survive Redis loss, but the worst case is the
+ * CLI continues to show "Waiting for you to sign in…" a little longer
+ * than necessary. No security impact.
+ */
 export const LinkPollPendingResponse = z.object({
   state: z.literal('pending'),
+  phase: z.enum(['awaiting_signin', 'awaiting_confirm']).optional(),
 });
 
 export const LinkPollConfirmedResponse = z.object({

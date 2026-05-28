@@ -27,7 +27,11 @@ import { TrustError } from './errors.js';
 
 export const ATTESTATION_JWT_ALG = 'EdDSA' as const;
 export const MAX_ATTESTATION_TTL_SECONDS = 900;
-export const LINK_REQUEST_TTL_SECONDS = 600;
+// 30 minutes. Tight enough that an abandoned link request doesn't
+// linger long, generous enough to survive an email magic-link round
+// trip (deliver → notice → click → consent → bounce back) plus a
+// detour to read other mail.
+export const LINK_REQUEST_TTL_SECONDS = 1800;
 export const ISS = 'afauth-trust';
 
 export async function listPublicJwks(vault: KeyVault): Promise<{ keys: JWK[] }> {

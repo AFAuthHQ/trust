@@ -96,6 +96,17 @@ export function createPageRoutes(deps: { store: Store; redis: Redis }): Hono {
 
     const human = await currentHuman(c, store);
     const verifications = human ? await store.listVerifications(human.id) : [];
+
+    // Mark this request as "viewed" so /v1/link/poll can advance the
+    // CLI from "awaiting_signin" to "awaiting_confirm". TTL matches
+    // the remaining link-request lifetime; expiring early just means
+    // the CLI drops back to the more generic phase, which is fine.
+    const ttlSec = Math.max(
+      1,
+      Math.floor((lr.expires_at.getTime() - Date.now()) / 1000),
+    );
+    await redis.setex(`link-viewed:${lr.id}`, ttlSec, '1');
+
     return c.html(
       await layout({
         title: 'Link this agent · trust.afauth.org',

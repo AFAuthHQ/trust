@@ -7,7 +7,7 @@ import { rateLimit, clientIp } from '../lib/ratelimit.js';
 import type { Store } from '../lib/store/index.js';
 import { generateToken, hashToken } from '../lib/tokens.js';
 import { sendMagicLink } from '../lib/verification/email.js';
-import { clearSessionCookie, createSessionCookie } from '../lib/auth.js';
+import { clearSessionCookie, createSessionCookie, currentHuman } from '../lib/auth.js';
 import { layout } from '../views/layout.js';
 import {
   signinCallbackErrorPage,
@@ -30,11 +30,15 @@ export function createAuthRoutes(deps: { store: Store; redis: Redis }): Hono {
   app.get('/signin', async (c) => {
     const next = c.req.query('next');
     const googleEnabled = !!getGoogleOauthConfig();
+    // `/link?req=...` is the only entry path that needs first-time
+    // signup framing. Strict prefix match — refuses other `/link*`
+    // pages (none exist today, but cheap to be defensive).
+    const context = next?.startsWith('/link?') ? 'link' : undefined;
     return c.html(
       await layout({
         title: 'Sign in · trust.afauth.org',
         path: '/signin',
-        body: signinPage({ next, googleEnabled }),
+        body: signinPage({ next, googleEnabled, context }),
       }),
     );
   });
@@ -79,11 +83,26 @@ export function createAuthRoutes(deps: { store: Store; redis: Redis }): Hono {
         await layout({
           title: 'Check your inbox · trust.afauth.org',
           path: '/signin',
-          body: signinSentPage({ email: parsed.data.email }),
+          body: signinSentPage({
+            email: parsed.data.email,
+            next: parsed.data.next,
+          }),
         }),
       );
     },
   );
+
+  // GET /auth/session — tiny status endpoint used by the "Check your
+  // inbox" page to self-heal: it polls every few seconds and redirects
+  // away once the magic-link click (in another tab) creates a session.
+  // No PII in the response — just a boolean, by design. Sits under
+  // /auth/* alongside /auth/google/* for namespacing.
+  app.get('/auth/session', async (c) => {
+    const human = await currentHuman(c, store);
+    return c.json({ authenticated: !!human }, 200, {
+      'cache-control': 'no-store',
+    });
+  });
 
   // GET /signin/callback — render consent page. We do NOT consume
   // the token here; pre-fetchers (M365 SafeLinks, Gmail scanner,

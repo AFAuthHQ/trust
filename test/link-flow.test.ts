@@ -36,10 +36,10 @@ describe('link flow — start → confirm → poll', () => {
     expect(body.req_id).toMatch(/^[0-9a-f-]{36}$/);
     expect(body.link_url).toContain('/link?req=');
     expect(body.poll_url).toContain('/v1/link/poll');
-    expect(body.expires_in).toBe(600);
+    expect(body.expires_in).toBe(1800);
   });
 
-  it('poll on a pending request returns state=pending', async () => {
+  it('poll on a pending request returns state=pending with phase=awaiting_signin', async () => {
     const { kp, body } = await startLink();
     const sig = await signEd25519(
       kp.privateKey,
@@ -50,7 +50,30 @@ describe('link flow — start → confirm → poll', () => {
       sig_b64: sig,
     });
     expect(r.status).toBe(200);
-    expect(await r.json()).toEqual({ state: 'pending' });
+    expect(await r.json()).toEqual({ state: 'pending', phase: 'awaiting_signin' });
+  });
+
+  it('phase flips to awaiting_confirm after the /link page is loaded', async () => {
+    const { kp, body } = await startLink();
+
+    // Simulate the browser opening the deep link. The page handler
+    // sets the per-request viewed marker we'll observe via /v1/link/poll.
+    const url = new URL(body.link_url);
+    const pageRes = await h.app.fetch(
+      new Request(`http://localhost${url.pathname}${url.search}`),
+    );
+    expect(pageRes.status).toBe(200);
+
+    const sig = await signEd25519(
+      kp.privateKey,
+      new TextEncoder().encode(body.req_id),
+    );
+    const r = await postJson(h.app, '/v1/link/poll', {
+      req_id: body.req_id,
+      sig_b64: sig,
+    });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual({ state: 'pending', phase: 'awaiting_confirm' });
   });
 
   it('poll without a valid agent signature is 401', async () => {

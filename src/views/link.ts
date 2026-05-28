@@ -24,11 +24,17 @@ export function linkConfirmPage(opts: {
     </p>
 
     <div class="card">
-      <h3 style="margin-top: 0;">Agent</h3>
-      <div class="did">${envelope.agent_did}</div>
+      <div style="font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted); margin-bottom: 4px;">
+        Agent
+      </div>
       ${envelope.agent_label
-        ? html`<div class="meta">${envelope.agent_label}</div>`
-        : ''}
+        ? html`
+            <div style="font-size: 22px; line-height: 1.25; font-weight: 600; margin: 0 0 10px;">
+              ${envelope.agent_label}
+            </div>
+            <div class="did" style="color: var(--muted);">${envelope.agent_did}</div>
+          `
+        : html`<div class="did" style="font-size: 16px;">${envelope.agent_did}</div>`}
       <div class="meta">Request expires in ${mins} min</div>
     </div>
 
