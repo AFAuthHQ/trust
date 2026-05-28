@@ -49,6 +49,8 @@ export interface MintAttestationOpts {
   agentDid: string;
   serviceDid: string;
   verification: AfauthTrustClaims['verification'];
+  /** §10.4 pairwise human pseudonym. Derived by the caller via `deriveSubH`. */
+  subH: string;
   /** Defaults to MAX_ATTESTATION_TTL_SECONDS. Capped per AFAP-0006. */
   ttlSeconds?: number;
 }
@@ -64,7 +66,10 @@ export async function mintAttestationJwt(
   const signingKey = await opts.vault.getSigningKey(active.kid);
   const iat = Math.floor(Date.now() / 1000);
   const exp = iat + ttl;
-  const jwt = await new SignJWT({ verification: opts.verification })
+  const jwt = await new SignJWT({
+    verification: opts.verification,
+    sub_h: opts.subH,
+  })
     .setProtectedHeader({ alg: ATTESTATION_JWT_ALG, typ: 'JWT', kid: active.kid })
     .setIssuer(ISS)
     .setSubject(opts.agentDid)

@@ -114,6 +114,7 @@ export interface AfauthTrustClaims {
   iss: 'afauth-trust';
   aud: string; // service_did
   sub: string; // agent_did
+  sub_h: string; // §10.4 — pairwise human pseudonym, base64url(HMAC-SHA256)
   iat: number;
   exp: number;
   verification: VerificationMethod;
