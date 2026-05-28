@@ -69,13 +69,30 @@ export class MemoryStore implements Store {
     human_id: string,
     method: VerificationMethod,
     provider: string,
+    external_subject?: string,
   ) {
+    // Enforce the partial unique index: (provider, external_subject)
+    // must point at exactly one human when subject is non-null.
+    if (external_subject) {
+      const conflict = this.verifications.find(
+        (v) =>
+          v.provider === provider &&
+          v.external_subject === external_subject &&
+          v.human_id !== human_id,
+      );
+      if (conflict) {
+        throw new Error(
+          `external subject already linked to a different human (provider=${provider})`,
+        );
+      }
+    }
     const existing = this.verifications.find(
       (v) => v.human_id === human_id && v.method === method && v.provider === provider,
     );
     if (existing) {
       existing.verified_at = new Date();
       existing.revoked_at = null;
+      if (external_subject) existing.external_subject = external_subject;
       return existing;
     }
     const v: VerificationRecord = {
@@ -83,6 +100,7 @@ export class MemoryStore implements Store {
       human_id,
       method,
       provider,
+      external_subject: external_subject ?? null,
       verified_at: new Date(),
       revoked_at: null,
     };
@@ -93,6 +111,26 @@ export class MemoryStore implements Store {
     return this.verifications.filter(
       (v) => v.human_id === human_id && v.revoked_at === null,
     );
+  }
+  async findVerificationByExternalSubject(provider: string, external_subject: string) {
+    return (
+      this.verifications.find(
+        (v) =>
+          v.provider === provider &&
+          v.external_subject === external_subject &&
+          v.revoked_at === null,
+      ) ?? null
+    );
+  }
+  async revokeVerification(human_id: string, method: VerificationMethod, provider: string) {
+    const v = this.verifications.find(
+      (v) =>
+        v.human_id === human_id &&
+        v.method === method &&
+        v.provider === provider &&
+        v.revoked_at === null,
+    );
+    if (v) v.revoked_at = new Date();
   }
 
   // Sessions

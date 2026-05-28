@@ -6,6 +6,7 @@ import { getConfig } from './lib/config.js';
 import { TrustError } from './lib/errors.js';
 import { PgEncryptedKeyVault, type KeyVault } from './lib/keyvault.js';
 import { getLogger } from './lib/logger.js';
+import type { GoogleOauthDeps } from './lib/oauth/google.js';
 import { closeRedis, getRedis } from './lib/redis.js';
 import { PgStore } from './lib/store/postgres.js';
 import type { Store } from './lib/store/index.js';
@@ -15,6 +16,7 @@ import { createAuthRoutes } from './routes/auth.js';
 import { createBindingRoutes } from './routes/bindings.js';
 import { healthRoutes } from './routes/health.js';
 import { createLinkRoutes } from './routes/link.js';
+import { createOauthGoogleRoutes } from './routes/oauth-google.js';
 import { createPageRoutes } from './routes/pages.js';
 import { createTokenRoutes } from './routes/token.js';
 import { createWellKnownRoutes } from './routes/wellknown.js';
@@ -23,6 +25,8 @@ export interface AppDeps {
   store: Store;
   redis: Redis;
   vault: KeyVault;
+  /** Test-only: inject a fake fetcher / JWKS for the Google OAuth client. */
+  googleOauthDeps?: GoogleOauthDeps;
 }
 
 export function createApp(deps: AppDeps): Hono {
@@ -107,6 +111,10 @@ export function createApp(deps: AppDeps): Hono {
   app.route('/v1/token', createTokenRoutes(deps));
   app.route('/v1/bindings', createBindingRoutes(deps));
   app.route('/admin', createAdminRoutes(deps));
+  app.route(
+    '/auth/google',
+    createOauthGoogleRoutes({ store: deps.store, redis: deps.redis, google: deps.googleOauthDeps }),
+  );
   app.route('/', createAuthRoutes(deps));
   app.route('/', createPageRoutes(deps));
 

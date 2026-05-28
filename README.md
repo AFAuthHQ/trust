@@ -145,6 +145,12 @@ Per-IP fixed-window in Redis.
    - `PUBLIC_BASE_URL=https://trust.afauth.org`
    - `JWKS_PUBLIC_URL=https://trust.afauth.org/.well-known/jwks.json`
    - `EMAIL_PROVIDER=<resend|postmark>` and `EMAIL_API_KEY=...`
+   - *(optional)* `GOOGLE_OAUTH_CLIENT_ID` + `GOOGLE_OAUTH_CLIENT_SECRET`
+     — enables "Continue with Google". Create in Google Cloud Console
+     → APIs & Services → Credentials → "OAuth 2.0 Client IDs". Add
+     `https://trust.afauth.org/auth/google/callback` as an authorized
+     redirect URI. The button hides itself when either env var is
+     missing.
 4. **Custom domain** → `trust.afauth.org`. This is also the
    AFAP-0006 §10.3.1 JWKS host — consuming services fetch
    `https://trust.afauth.org/.well-known/jwks.json` directly. No

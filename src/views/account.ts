@@ -19,11 +19,13 @@ export function accountPage(opts: {
   verifications: VerificationRecord[];
   bindings: BindingRecord[];
   recentTokens: RecentToken[];
+  googleEnabled?: boolean;
 }) {
-  const { human, verifications, bindings, recentTokens } = opts;
+  const { human, verifications, bindings, recentTokens, googleEnabled } = opts;
   const hasEmail = verifications.some((v) => v.method === 'email');
-  const hasOauth = verifications.some((v) => v.method === 'oauth');
-  const hasPayment = verifications.some((v) => v.method === 'payment');
+  const googleVerification = verifications.find(
+    (v) => v.method === 'oauth' && v.provider === 'google',
+  );
 
   return html`
     <div style="display: flex; justify-content: space-between; align-items: baseline;">
@@ -68,11 +70,32 @@ export function accountPage(opts: {
     <div class="card">
       <div class="card-row">
         <div>
-          <strong>OAuth</strong>
-          <span class="pill pill-dim">coming v0.2</span>
-          <div class="meta">Sign in with Google or GitHub.</div>
+          <strong>Google</strong>
+          ${googleVerification
+            ? html`
+                <span class="pill pill-ok">connected</span>
+                <div class="meta">
+                  since ${googleVerification.verified_at.toISOString().slice(0, 10)}
+                </div>
+              `
+            : googleEnabled
+              ? html`<span class="pill pill-dim">not connected</span>`
+              : html`<span class="pill pill-dim">coming soon</span>`}
+          <div class="meta">
+            Verifies your identity via Google. Upgrades the
+            <code>verification</code> claim on issued tokens from
+            <code>email</code> to <code>oauth</code>.
+          </div>
         </div>
-        <button class="btn" disabled>Add</button>
+        ${googleVerification
+          ? html`
+              <form method="post" action="/auth/google/revoke" style="margin: 0;">
+                <button class="btn btn-danger" type="submit">Disconnect</button>
+              </form>
+            `
+          : googleEnabled
+            ? html`<a class="btn" href="/auth/google/start?next=%2Faccount">Connect</a>`
+            : html`<button class="btn" disabled>Connect</button>`}
       </div>
     </div>
 
@@ -168,7 +191,6 @@ export function accountPage(opts: {
         `
       : ''}
 
-    ${hasOauth || hasPayment ? '' : ''}
   `;
 }
 

@@ -1,11 +1,30 @@
 import { html } from 'hono/html';
 
-export function signinPage(opts: { next?: string }) {
+export function signinPage(opts: { next?: string; googleEnabled?: boolean }) {
+  const googleHref = opts.next
+    ? `/auth/google/start?next=${encodeURIComponent(opts.next)}`
+    : '/auth/google/start';
   return html`
     <h1>Sign in</h1>
     <p class="lede">
-      Enter your email; we'll send you a one-time sign-in link.
+      ${opts.googleEnabled
+        ? html`Continue with Google, or get a one-time link by email.`
+        : html`Enter your email; we'll send you a one-time sign-in link.`}
     </p>
+    ${opts.googleEnabled
+      ? html`
+          <div style="max-width: 420px; margin-bottom: 14px;">
+            <a class="btn" href="${googleHref}" style="width: 100%; justify-content: center;">
+              Continue with Google
+            </a>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; max-width: 420px; margin: 18px 0; color: var(--muted); font-size: 13px;">
+            <hr style="flex: 1; border: none; border-top: 1px solid var(--line); margin: 0;">
+            <span>or</span>
+            <hr style="flex: 1; border: none; border-top: 1px solid var(--line); margin: 0;">
+          </div>
+        `
+      : ''}
     <form class="stack" method="post" action="/signin">
       ${opts.next ? html`<input type="hidden" name="next" value="${opts.next}">` : ''}
       <label>
@@ -17,9 +36,11 @@ export function signinPage(opts: { next?: string }) {
       </div>
     </form>
     <p style="margin-top: 28px; font-size: 13px; color: var(--muted);">
-      Email is the only verification method available at v0.1.
-      OAuth (Google, GitHub) and payment-card verification ship in
-      future revisions.
+      ${opts.googleEnabled
+        ? html`Payment-card verification ships in a future revision.`
+        : html`Email is the only verification method available at v0.1. OAuth
+          (Google, GitHub) and payment-card verification ship in future
+          revisions.`}
     </p>
   `;
 }
