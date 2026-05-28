@@ -11,6 +11,7 @@ export type ErrorCode =
   | 'binding_revoked'
   | 'binding_expired'
   | 'binding_not_ready'
+  | 'agent_already_bound'
   | 'verification_required'
   | 'internal_error';
 
@@ -82,6 +83,17 @@ export class TrustError extends Error {
   }
   static bindingNotReady(message = 'Link request not yet confirmed') {
     return new TrustError('binding_not_ready', message, 202);
+  }
+  /**
+   * AFAP-0006 §10.5 — at most one active human binding per agent DID
+   * per attestor. The message MUST NOT disclose which human currently
+   * owns the binding (the existing owner's pseudonymity is preserved
+   * even from would-be hijackers who guessed the agent DID).
+   */
+  static agentAlreadyBound(
+    message = 'This agent identity is already linked to a different account. The current owner must revoke first.',
+  ) {
+    return new TrustError('agent_already_bound', message, 409);
   }
   static verificationRequired(
     message = 'Service requires a verification method this account does not have',

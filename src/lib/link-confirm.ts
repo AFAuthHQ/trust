@@ -41,6 +41,16 @@ export async function confirmLinkRequest(args: {
     throw TrustError.gone('Link request expired');
   }
 
+  // §10.5 — pre-check that the agent_did isn't already bound by a
+  // different human. The store enforces this too (and catches the
+  // concurrent-confirm race via SELECT FOR UPDATE / unique index);
+  // this read gives a clean, fast rejection in the common case
+  // without disclosing which human currently owns the binding.
+  const existingActive = await store.findActiveBindingByAgentDid(lr.agent_did);
+  if (existingActive && existingActive.human_id !== human.id) {
+    throw TrustError.agentAlreadyBound();
+  }
+
   const bindingTokenRaw = generateToken();
   const bindingTokenHash = hashToken(bindingTokenRaw);
   const bindingExpires = new Date(Date.now() + BINDING_TTL_SECONDS * 1000);

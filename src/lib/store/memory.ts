@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { TrustError } from '../errors.js';
 import type {
   BindingRecord,
   CreateBindingInput,
@@ -237,16 +238,19 @@ export class MemoryStore implements Store {
 
   // Bindings
   async createBinding(input: CreateBindingInput) {
-    // Upsert by (human_id, agent_did)
-    for (const b of this.bindings.values()) {
-      if (b.human_id === input.human_id && b.agent_did === input.agent_did) {
-        b.agent_label = input.agent_label ?? null;
-        b.agent_pubkey_b64 = input.agent_pubkey_b64;
-        b.binding_token_hash = input.binding_token_hash;
-        b.expires_at = input.expires_at;
-        b.revoked_at = null;
-        return b;
-      }
+    // §10.5 — at most one active binding per agent_did. If one
+    // exists for a different human, reject; if for the same human,
+    // refresh in place (re-link to rotate the token).
+    const existingActive = await this.findActiveBindingByAgentDid(input.agent_did);
+    if (existingActive && existingActive.human_id !== input.human_id) {
+      throw TrustError.agentAlreadyBound();
+    }
+    if (existingActive && existingActive.human_id === input.human_id) {
+      existingActive.agent_label = input.agent_label ?? null;
+      existingActive.agent_pubkey_b64 = input.agent_pubkey_b64;
+      existingActive.binding_token_hash = input.binding_token_hash;
+      existingActive.expires_at = input.expires_at;
+      return existingActive;
     }
     const b: BindingRecord = {
       id: randomUUID(),
@@ -271,6 +275,12 @@ export class MemoryStore implements Store {
   }
   async getBindingById(id: string) {
     return this.bindings.get(id) ?? null;
+  }
+  async findActiveBindingByAgentDid(agent_did: string) {
+    for (const b of this.bindings.values()) {
+      if (b.agent_did === agent_did && b.revoked_at === null) return b;
+    }
+    return null;
   }
   async listBindingsByHuman(human_id: string) {
     return [...this.bindings.values()]

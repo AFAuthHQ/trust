@@ -153,3 +153,107 @@ describe('link flow — start → confirm → poll', () => {
     expect(r.status).toBe(401);
   });
 });
+
+describe('AFAP-0006 §10.5 — one active human binding per agent DID', () => {
+  let h: TestHarness;
+  beforeEach(async () => {
+    h = await createTestHarness();
+  });
+
+  async function linkAs(human: { id: string; primary_email: string }, agentDid: string, pubKeyB64: string) {
+    const lr = await h.store.createLinkRequest({
+      agent_did: agentDid,
+      agent_pubkey_b64: pubKeyB64,
+      expires_at: new Date(Date.now() + 30 * 60_000),
+    });
+    return confirmLinkRequest({
+      store: h.store,
+      redis: h.redis,
+      human: { id: human.id, primary_email: human.primary_email, created_at: new Date(), disabled_at: null },
+      reqId: lr.id,
+    });
+  }
+
+  it('rejects a second binding for the same agent_did from a different human', async () => {
+    const kp = await createAgentKeypair();
+    const alice = await h.store.upsertHuman({ primary_email: 'alice@example.com' });
+    const bob = await h.store.upsertHuman({ primary_email: 'bob@example.com' });
+
+    const aliceConfirm = await linkAs(alice, kp.did, kp.publicKeyB64);
+    expect(aliceConfirm.binding_id).toBeTruthy();
+
+    await expect(linkAs(bob, kp.did, kp.publicKeyB64)).rejects.toMatchObject({
+      code: 'agent_already_bound',
+      status: 409,
+    });
+  });
+
+  it('rejection message does NOT disclose the existing owner', async () => {
+    const kp = await createAgentKeypair();
+    const alice = await h.store.upsertHuman({ primary_email: 'alice@example.com' });
+    const bob = await h.store.upsertHuman({ primary_email: 'bob@example.com' });
+    await linkAs(alice, kp.did, kp.publicKeyB64);
+
+    try {
+      await linkAs(bob, kp.did, kp.publicKeyB64);
+      throw new Error('expected agentAlreadyBound');
+    } catch (err) {
+      const msg = (err as { message: string }).message;
+      expect(msg).not.toMatch(/alice/i);
+      expect(msg).not.toMatch(/example\.com/i);
+      expect(msg).not.toMatch(alice.id);
+    }
+  });
+
+  it('allows the same human to re-link the same agent_did (refresh binding token)', async () => {
+    const kp = await createAgentKeypair();
+    const alice = await h.store.upsertHuman({ primary_email: 'alice@example.com' });
+
+    const first = await linkAs(alice, kp.did, kp.publicKeyB64);
+    const second = await linkAs(alice, kp.did, kp.publicKeyB64);
+
+    expect(second.binding_id).toBe(first.binding_id); // same row, refreshed
+    expect(second.binding_token).not.toBe(first.binding_token); // new token
+  });
+
+  it('allows a different human to bind after the existing owner revokes', async () => {
+    const kp = await createAgentKeypair();
+    const alice = await h.store.upsertHuman({ primary_email: 'alice@example.com' });
+    const bob = await h.store.upsertHuman({ primary_email: 'bob@example.com' });
+
+    const aliceConfirm = await linkAs(alice, kp.did, kp.publicKeyB64);
+    await h.store.revokeBinding(aliceConfirm.binding_id, alice.id);
+
+    const bobConfirm = await linkAs(bob, kp.did, kp.publicKeyB64);
+    expect(bobConfirm.binding_id).toBeTruthy();
+    expect(bobConfirm.binding_id).not.toBe(aliceConfirm.binding_id);
+  });
+
+  it('different humans can bind different agent_dids without conflict', async () => {
+    const kp1 = await createAgentKeypair();
+    const kp2 = await createAgentKeypair();
+    const alice = await h.store.upsertHuman({ primary_email: 'alice@example.com' });
+    const bob = await h.store.upsertHuman({ primary_email: 'bob@example.com' });
+
+    const a = await linkAs(alice, kp1.did, kp1.publicKeyB64);
+    const b = await linkAs(bob, kp2.did, kp2.publicKeyB64);
+
+    expect(a.binding_id).toBeTruthy();
+    expect(b.binding_id).toBeTruthy();
+    expect(a.binding_id).not.toBe(b.binding_id);
+  });
+
+  it('findActiveBindingByAgentDid returns null for revoked bindings', async () => {
+    const kp = await createAgentKeypair();
+    const alice = await h.store.upsertHuman({ primary_email: 'alice@example.com' });
+    const confirm = await linkAs(alice, kp.did, kp.publicKeyB64);
+
+    const before = await h.store.findActiveBindingByAgentDid(kp.did);
+    expect(before?.id).toBe(confirm.binding_id);
+
+    await h.store.revokeBinding(confirm.binding_id, alice.id);
+
+    const after = await h.store.findActiveBindingByAgentDid(kp.did);
+    expect(after).toBeNull();
+  });
+});
