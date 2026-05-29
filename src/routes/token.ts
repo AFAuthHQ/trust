@@ -73,6 +73,10 @@ export function createTokenRoutes(deps: { store: Store; redis: Redis; vault: Key
         throw TrustError.internal('Failed to rank verifications');
       }
 
+      // sub_h is keyed on the human (binding.human_id), NOT binding.agent_did:
+      // a rotated key re-linked to the same human, or a revoke-then-rebind to
+      // the same human, yields the same sub_h per service (§10.4.2, §10.5.1).
+      // Never add the agent DID here — it would reopen the §10.5.2 Sybil dedup.
       const subH = deriveSubH(binding.human_id, body.data.aud, pseudonymKeyBytes());
 
       const { jwt, kid, iat, exp } = await mintAttestationJwt({

@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { Pool } from 'pg';
 import type { JWK } from 'jose';
 import { getConfig } from '../config.js';
+import { canonicalizeEmail } from '../email.js';
 import { TrustError } from '../errors.js';
 import type {
   BindingRecord,
@@ -71,7 +72,7 @@ export class PgStore implements Store {
   async getHumanByEmail(email: string): Promise<HumanRecord | null> {
     const { rows } = await this.pool.query(
       'SELECT * FROM humans WHERE primary_email = $1',
-      [email.toLowerCase()],
+      [canonicalizeEmail(email)],
     );
     return rows[0] ? toHuman(rows[0]) : null;
   }
@@ -82,7 +83,7 @@ export class PgStore implements Store {
   }
 
   async upsertHuman(input: CreateHumanInput): Promise<HumanRecord> {
-    const email = input.primary_email.toLowerCase();
+    const email = canonicalizeEmail(input.primary_email);
     const { rows } = await this.pool.query(
       `INSERT INTO humans (primary_email) VALUES ($1)
        ON CONFLICT (primary_email) DO UPDATE SET primary_email = EXCLUDED.primary_email
@@ -190,7 +191,7 @@ export class PgStore implements Store {
     const { rows } = await this.pool.query(
       `INSERT INTO magic_links (email, token_hash, expires_at, next_path)
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      [email.toLowerCase(), token_hash, expires_at, next_path ?? null],
+      [canonicalizeEmail(email), token_hash, expires_at, next_path ?? null],
     );
     return toMagicLink(rows[0]);
   }

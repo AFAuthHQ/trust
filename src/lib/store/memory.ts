@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { canonicalizeEmail } from '../email.js';
 import { TrustError } from '../errors.js';
 import type {
   BindingRecord,
@@ -43,7 +44,7 @@ export class MemoryStore implements Store {
 
   // Humans
   async getHumanByEmail(email: string) {
-    const norm = email.toLowerCase();
+    const norm = canonicalizeEmail(email);
     for (const h of this.humans.values()) {
       if (h.primary_email === norm) return h;
     }
@@ -57,7 +58,7 @@ export class MemoryStore implements Store {
     if (existing) return existing;
     const h: HumanRecord = {
       id: randomUUID(),
-      primary_email: input.primary_email.toLowerCase(),
+      primary_email: canonicalizeEmail(input.primary_email),
       created_at: new Date(),
       disabled_at: null,
     };
@@ -167,7 +168,7 @@ export class MemoryStore implements Store {
   ) {
     const m: MagicLinkRecord = {
       id: randomUUID(),
-      email: email.toLowerCase(),
+      email: canonicalizeEmail(email),
       token_hash,
       expires_at,
       consumed_at: null,

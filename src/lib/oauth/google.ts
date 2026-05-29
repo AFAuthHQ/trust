@@ -1,5 +1,6 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { createRemoteJWKSet, jwtVerify, type JWTPayload, type JWTVerifyGetKey } from 'jose';
+import { canonicalizeEmail } from '../email.js';
 
 /**
  * Google OAuth 2.0 + OpenID Connect helpers for trust.afauth.org.
@@ -122,7 +123,7 @@ export class GoogleOauthClient {
     assertNonce(claims, opts.expectedNonce);
 
     const subject = typeof claims.sub === 'string' ? claims.sub : '';
-    const email = typeof claims.email === 'string' ? claims.email.toLowerCase() : '';
+    const email = typeof claims.email === 'string' ? canonicalizeEmail(claims.email) : '';
     const emailVerified = claims.email_verified === true;
     if (!subject) throw new Error('Google ID token missing sub');
     if (!email) throw new Error('Google ID token missing email');

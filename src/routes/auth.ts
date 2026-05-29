@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type Redis from 'ioredis';
 import { z } from 'zod';
 import { getConfig, getGoogleOauthConfig } from '../lib/config.js';
+import { canonicalizeEmail } from '../lib/email.js';
 import { TrustError } from '../lib/errors.js';
 import { rateLimit, clientIp } from '../lib/ratelimit.js';
 import type { Store } from '../lib/store/index.js';
@@ -60,7 +61,7 @@ export function createAuthRoutes(deps: { store: Store; redis: Redis }): Hono {
       if (!parsed.success) throw TrustError.invalidRequest('Email required');
 
       // Per-email rate limit (loose ceiling for abuse).
-      const emailKey = `signin:email:${parsed.data.email.toLowerCase()}`;
+      const emailKey = `signin:email:${canonicalizeEmail(parsed.data.email)}`;
       const emailCount = await redis.incr(emailKey);
       if (emailCount === 1) await redis.expire(emailKey, 3600);
       if (emailCount > 10) throw TrustError.rateLimited('Too many signin attempts for this email');
