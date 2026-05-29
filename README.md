@@ -75,6 +75,7 @@ claims: {
   iss: "afauth-trust",
   aud: "<service_did>",
   sub: "<agent_did>",
+  sub_h: "<base64url HMAC-SHA256 pairwise human pseudonym>",
   iat: <unix>,
   exp: <iat + ≤900>,
   verification: "email" | "oauth" | "payment"
@@ -82,7 +83,10 @@ claims: {
 ```
 
 No PII. The `verification` value is the strongest method the linked
-human has on file at issuance time.
+human has on file at issuance time. `sub_h` is a pairwise pseudonym —
+stable per `(human, aud)` but unlinkable across services — so a service
+can bucket anti-abuse state (quotas, bans) on the human behind an agent
+without learning their identity.
 
 ## Key management
 

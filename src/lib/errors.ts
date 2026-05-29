@@ -6,6 +6,7 @@ export type ErrorCode =
   | 'not_found'
   | 'conflict'
   | 'gone'
+  | 'link_request_expired'
   | 'rate_limited'
   | 'invalid_attestation'
   | 'binding_revoked'
@@ -71,6 +72,14 @@ export class TrustError extends Error {
   }
   static gone(message: string) {
     return new TrustError('gone', message, 410);
+  }
+  /**
+   * Poll-time 410 for the link ceremony: the link request expired before a
+   * human confirmed, or the one-time binding token was already retrieved.
+   * Distinct from the generic `gone` so agents can branch on "start over".
+   */
+  static linkRequestExpired(message: string) {
+    return new TrustError('link_request_expired', message, 410);
   }
   static rateLimited(message = 'Rate limit exceeded') {
     return new TrustError('rate_limited', message, 429);

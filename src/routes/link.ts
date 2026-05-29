@@ -193,13 +193,15 @@ export function createLinkRoutes(deps: { store: Store; redis: Redis }): Hono {
         });
       }
       if (lr.state !== 'confirmed') {
-        throw TrustError.gone(`Link request is ${lr.state}`);
+        throw TrustError.linkRequestExpired(`Link request is ${lr.state}`);
       }
 
       // Pop the binding token from Redis exactly once.
       const cached = await redis.getdel(`binding-token:${lr.id}`);
       if (!cached) {
-        throw TrustError.gone('Binding token already retrieved or expired');
+        throw TrustError.linkRequestExpired(
+          'Binding token already retrieved or expired',
+        );
       }
       const payload = JSON.parse(cached);
       return c.json({ state: 'confirmed' as const, ...payload });

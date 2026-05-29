@@ -125,6 +125,11 @@ describe('link flow — start → confirm → poll', () => {
       sig_b64: sig,
     });
     expect(r2.status).toBe(410);
+    // The documented poll error code (trust-api §errors) is the descriptive
+    // `link_request_expired`, not the generic `gone`.
+    expect(((await r2.json()) as { error: { code: string } }).error.code).toBe(
+      'link_request_expired',
+    );
   });
 
   it('rejects loopback callbacks that are not 127.0.0.1/localhost', async () => {
