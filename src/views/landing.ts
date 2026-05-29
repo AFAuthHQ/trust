@@ -69,7 +69,7 @@ export function landingPage() {
     <h2 style="margin-top: 28px;">Verification methods</h2>
     <p style="display: flex; flex-wrap: wrap; gap: 8px; margin: 0;">
       <span class="pill pill-ok">email · live</span>
-      <span class="pill pill-dim">oauth · scaffolded</span>
+      <span class="pill pill-ok">oauth · live</span>
       <span class="pill pill-dim">payment · scaffolded</span>
     </p>
 
@@ -98,6 +98,7 @@ new Server({
           <tr style="border-bottom: 1px solid var(--line);"><td style="padding: 10px 12px 10px 0; vertical-align: top;"><code>iss</code></td><td style="padding: 10px 0;">Always <code>"afauth-trust"</code>.</td></tr>
           <tr style="border-bottom: 1px solid var(--line);"><td style="padding: 10px 12px 10px 0; vertical-align: top;"><code>aud</code></td><td style="padding: 10px 0;">Destination <code>service_did</code>. Reject mismatches.</td></tr>
           <tr style="border-bottom: 1px solid var(--line);"><td style="padding: 10px 12px 10px 0; vertical-align: top;"><code>sub</code></td><td style="padding: 10px 0;">The agent's account DID.</td></tr>
+          <tr style="border-bottom: 1px solid var(--line);"><td style="padding: 10px 12px 10px 0; vertical-align: top;"><code>sub_h</code></td><td style="padding: 10px 0;">Pairwise human pseudonym. Stable per <code>(iss, sub_h, aud)</code>, opaque base64url. Use as a per-service handle for the human behind the agent.</td></tr>
           <tr style="border-bottom: 1px solid var(--line);"><td style="padding: 10px 12px 10px 0; vertical-align: top;"><code>verification</code></td><td style="padding: 10px 0;"><code>"email"</code>, <code>"oauth"</code>, or <code>"payment"</code>. Ignore unknown values.</td></tr>
           <tr style="border-bottom: 1px solid var(--line);"><td style="padding: 10px 12px 10px 0; vertical-align: top;"><code>iat</code></td><td style="padding: 10px 0;">Issued-at, Unix seconds.</td></tr>
           <tr><td style="padding: 10px 12px 10px 0; vertical-align: top;"><code>exp</code></td><td style="padding: 10px 0;">At most 900 seconds after <code>iat</code>.</td></tr>
