@@ -13,8 +13,7 @@ by this service.
 
 ## Status
 
-**v0.1 — Working Draft.** Email verification only at launch; OAuth
-and payment methods are scaffolded for v0.2 / v0.3.
+**v0.1.** Email-verified human ↔ agent bindings.
 
 ## Stack
 
