@@ -160,7 +160,14 @@ export function accountPage(opts: {
                 ${b.revoked_at
                   ? ''
                   : html`
-                      <form method="post" action="/account/bindings/${b.id}/revoke" style="margin: 0;">
+                      <form
+                        method="post"
+                        action="/account/bindings/${b.id}/revoke"
+                        style="margin: 0;"
+                        data-revoke
+                        data-agent-did="${b.agent_did}"
+                        data-agent-label="${b.agent_label ?? ''}"
+                      >
                         <button type="submit" class="btn btn-danger">Revoke</button>
                       </form>
                     `}
@@ -255,6 +262,40 @@ export function accountPage(opts: {
         `
       : ''}
 
+    ${bindings.filter((b) => !b.revoked_at).length > 0
+      ? html`
+          <dialog id="revoke-modal" class="modal" aria-labelledby="revoke-modal-title">
+            <div class="modal-body">
+              <h2 id="revoke-modal-title">Revoke this agent?</h2>
+              <p class="modal-eyebrow">Agent</p>
+              <p class="modal-agent-label" data-modal-label hidden></p>
+              <div class="did" data-modal-did style="color: var(--muted); margin-bottom: 16px;"></div>
+              <p style="margin: 0 0 10px;">
+                Revoking <strong>can't be undone</strong>. The attestor
+                immediately stops issuing new tokens for this agent under
+                your identity.
+              </p>
+              <ul style="margin: 0; padding-left: 18px; font-size: 14px; color: var(--muted);">
+                <li>Takes effect within 15 minutes (AFAuth's revocation bound).</li>
+                <li>Tokens already minted stay valid at services until they
+                    expire (max 15 min).</li>
+                <li>To let this agent act for you again you'd have to link it
+                    again from scratch — a fresh confirmation.</li>
+                <li>Your other agents are unaffected.</li>
+              </ul>
+              <div class="modal-actions">
+                <button type="button" class="btn" data-modal-cancel autofocus>
+                  Cancel
+                </button>
+                <button type="button" class="btn btn-danger" data-modal-confirm>
+                  Revoke this agent
+                </button>
+              </div>
+            </div>
+          </dialog>
+          <script src="/account-confirm.js" defer></script>
+        `
+      : ''}
   `;
 }
 

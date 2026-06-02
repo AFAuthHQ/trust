@@ -196,6 +196,37 @@ const STYLE = `
   .pill-dim { background: var(--code); color: var(--muted); }
   .pill-warn { background: #f5e3df; color: var(--accent); }
 
+  /* Confirmation modal (native <dialog>, opened by /account-confirm.js).
+     Gates the permanent "Revoke agent" action behind an explicit confirm. */
+  dialog.modal {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 0;
+    max-width: 460px;
+    width: calc(100% - 32px);
+    background: var(--paper);
+    color: var(--fg);
+    box-shadow: 0 24px 60px rgba(20, 16, 8, 0.28);
+  }
+  dialog.modal::backdrop { background: rgba(20, 16, 8, 0.45); }
+  dialog.modal .modal-body { padding: 24px 24px 20px; }
+  dialog.modal h2 { margin: 0 0 14px; font-size: 20px; }
+  dialog.modal .modal-eyebrow {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+    margin: 0 0 4px;
+  }
+  dialog.modal .modal-agent-label { font-size: 16px; font-weight: 600; margin: 0 0 6px; }
+  dialog.modal .modal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 22px;
+  }
+
   footer.site {
     max-width: 720px;
     margin: 32px auto 0;
