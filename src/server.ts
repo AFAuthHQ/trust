@@ -25,6 +25,8 @@ export interface AppDeps {
   store: Store;
   redis: Redis;
   vault: KeyVault;
+  /** §10.7 per-binding daily attestation mint cap. Defaults to DEFAULT_PER_BINDING_DAILY_TOKEN_LIMIT. */
+  perBindingDailyTokenLimit?: number;
   /** Test-only: inject a fake fetcher / JWKS for the Google OAuth client. */
   googleOauthDeps?: GoogleOauthDeps;
 }
@@ -140,7 +142,12 @@ async function main(): Promise<void> {
   const key = await vault.ensureActiveKey();
   log.info({ kid: key.kid, alg: key.alg }, 'signing key ready (encrypted at rest)');
 
-  const app = createApp({ store, redis, vault });
+  const app = createApp({
+    store,
+    redis,
+    vault,
+    perBindingDailyTokenLimit: cfg.TRUST_PER_BINDING_DAILY_TOKEN_LIMIT,
+  });
 
   const rotationCron = startRotationCron(vault, cfg.TRUST_ROTATION_SCHEDULE);
   if (rotationCron) {

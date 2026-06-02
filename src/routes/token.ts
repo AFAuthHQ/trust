@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type Redis from 'ioredis';
 import { TrustError } from '../lib/errors.js';
+import { getLogger } from '../lib/logger.js';
 import type { KeyVault } from '../lib/keyvault.js';
 import { rateLimit, clientIp } from '../lib/ratelimit.js';
 import { deriveSubH, pseudonymKeyBytes } from '../lib/pseudonym.js';
@@ -9,7 +10,15 @@ import { mintAttestationJwt } from '../lib/signing.js';
 import type { Store } from '../lib/store/index.js';
 import { hashToken } from '../lib/tokens.js';
 
-const PER_BINDING_DAILY_LIMIT = 1000;
+/**
+ * §10.7: default per-binding daily attestation mint cap, across all
+ * audiences. Sized for the attested-session re-mint cadence — an agent
+ * keeps a fresh attestation on file per service and re-mints
+ * ~100×/service/day at the 900s TTL ceiling (§10.2), so a binding used
+ * across many `attested_only` services needs well above the old 1,000.
+ * Overridable per deployment via TRUST_PER_BINDING_DAILY_TOKEN_LIMIT.
+ */
+export const DEFAULT_PER_BINDING_DAILY_TOKEN_LIMIT = 10_000;
 
 /**
  * Ranks verification methods strongest → weakest. The trust attestor
@@ -19,8 +28,16 @@ const PER_BINDING_DAILY_LIMIT = 1000;
  */
 const VERIFICATION_RANK: VerificationMethod[] = ['payment', 'oauth', 'email'];
 
-export function createTokenRoutes(deps: { store: Store; redis: Redis; vault: KeyVault }): Hono {
+export function createTokenRoutes(deps: {
+  store: Store;
+  redis: Redis;
+  vault: KeyVault;
+  /** §10.7 per-binding daily mint cap. Defaults to DEFAULT_PER_BINDING_DAILY_TOKEN_LIMIT. */
+  perBindingDailyTokenLimit?: number;
+}): Hono {
   const { store, redis, vault } = deps;
+  const perBindingDailyLimit =
+    deps.perBindingDailyTokenLimit ?? DEFAULT_PER_BINDING_DAILY_TOKEN_LIMIT;
   const app = new Hono();
 
   // ------ POST /v1/token --------------------------------------------
@@ -67,9 +84,16 @@ export function createTokenRoutes(deps: { store: Store; redis: Redis; vault: Key
       const dayKey = `token:binding:${binding.id}:${new Date().toISOString().slice(0, 10)}`;
       const dayCount = await redis.incr(dayKey);
       if (dayCount === 1) await redis.expire(dayKey, 86400);
-      if (dayCount > PER_BINDING_DAILY_LIMIT) {
+      if (dayCount > perBindingDailyLimit) {
+        // A throttle is a rate cap, NOT a revocation. Log it so an
+        // operator can distinguish "raise TRUST_PER_BINDING_DAILY_TOKEN_LIMIT
+        // for this fleet's §10.7 re-mint load" from a genuine kill-switch.
+        getLogger().warn(
+          { binding_id: binding.id, day_count: dayCount, limit: perBindingDailyLimit },
+          'per-binding daily token limit exceeded — throttling mint (429 rate_limited, not a revocation)',
+        );
         throw TrustError.rateLimited(
-          `Per-binding daily limit (${PER_BINDING_DAILY_LIMIT}) exceeded`,
+          `Per-binding daily limit (${perBindingDailyLimit}) exceeded`,
         );
       }
 
