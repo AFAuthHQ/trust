@@ -132,7 +132,7 @@ Per-IP fixed-window in Redis.
 |---|---|
 | `POST /v1/link/start`     | 30 / minute |
 | `POST /v1/link/poll`      | 60 / minute |
-| `POST /v1/token`          | 60 / minute, 1000 / day per binding |
+| `POST /v1/token`          | 60 / minute, 10,000 / day per binding (`TRUST_PER_BINDING_DAILY_TOKEN_LIMIT`, configurable) |
 | `POST /signin`            | 5 / minute per IP, 10 / hour per email |
 | All others                | 600 / minute |
 
