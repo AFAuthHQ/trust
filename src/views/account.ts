@@ -184,7 +184,13 @@ export function accountPage(opts: {
                   disabled may stay valid at services until they expire
                   (max 15 min).
                 </div>
-                <div class="meta">Re-enabling requires a fresh sign-in.</div>
+                <div class="meta">
+                  Re-enabling requires a fresh sign-in, and it restores
+                  minting for <strong>every agent you have not individually
+                  revoked</strong>. If an agent was compromised, revoke it
+                  (above) <strong>before</strong> re-enabling — revoke is
+                  permanent; re-enable is not.
+                </div>
               </div>
               <form method="post" action="/account/enable" style="margin: 0;">
                 <button type="submit" class="btn">Re-enable account</button>
@@ -203,6 +209,13 @@ export function accountPage(opts: {
                   attestor from issuing new tokens for every agent linked
                   to this account at once. Already-issued tokens stay valid
                   until they expire (max 15 min). You can re-enable anytime.
+                </div>
+                <div class="meta">
+                  If only one agent is compromised, <strong>Revoke that agent
+                  above</strong> instead — revoke is permanent, whereas
+                  re-enabling restores minting for every agent you did not
+                  revoke. Disable is a temporary blanket pause, not a fix for
+                  a stolen key.
                 </div>
               </div>
               <form method="post" action="/account/disable" style="margin: 0;">

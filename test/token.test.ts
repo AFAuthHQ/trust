@@ -204,6 +204,42 @@ describe('POST /v1/token — §10 attestation issuance', () => {
     expect((await mint()).status).toBe(200);
   });
 
+  it('a per-binding revoke survives a disable/enable cycle — re-enable does not re-arm a revoked agent', async () => {
+    // Two agents under ONE human: A (healthy) and B (compromised).
+    const a = await setupLinked({ email: 'owner@example.com' });
+    const b = await setupLinked({ email: 'owner@example.com' });
+    expect(b.human.id).toBe(a.human.id); // same human, two distinct bindings
+
+    const mint = (binding_token: string) =>
+      postJson(
+        h.app,
+        '/v1/token',
+        { aud: 'did:web:svc.example' },
+        { headers: { authorization: `Bearer ${binding_token}` } },
+      );
+
+    expect((await mint(a.binding_token)).status).toBe(200);
+    expect((await mint(b.binding_token)).status).toBe(200);
+
+    // Owner permanently revokes the compromised agent B, then uses the
+    // reversible blanket kill-switch (disable -> re-enable) during recovery.
+    await h.store.revokeBinding(b.binding_id, a.human.id);
+    await h.store.setHumanDisabled(a.human.id, true);
+    await h.store.setHumanDisabled(a.human.id, false);
+
+    // Healthy agent A is restored by the re-enable...
+    expect((await mint(a.binding_token)).status).toBe(200);
+
+    // ...but compromised agent B stays locked out: a per-binding revoke is
+    // permanent and is NOT undone by re-enable (no silent re-arm). This is the
+    // invariant the recovery runbook + dashboard re-arm warning rely on.
+    const rb = await mint(b.binding_token);
+    expect(rb.status).toBe(403);
+    expect(((await rb.json()) as { error: { code: string } }).error.code).toBe(
+      'binding_revoked',
+    );
+  });
+
   it('a disabled human consumes no per-binding quota (check precedes redis.incr)', async () => {
     const { binding_token, binding_id, human } = await setupLinked();
     await h.store.setHumanDisabled(human.id, true);
