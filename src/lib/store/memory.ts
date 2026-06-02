@@ -65,6 +65,12 @@ export class MemoryStore implements Store {
     this.humans.set(h.id, h);
     return h;
   }
+  async setHumanDisabled(human_id: string, disabled: boolean) {
+    const h = this.humans.get(human_id);
+    if (!h) return null;
+    h.disabled_at = disabled ? new Date() : null;
+    return h;
+  }
 
   // Verifications
   async recordVerification(

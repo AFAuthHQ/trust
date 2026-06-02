@@ -10,6 +10,7 @@ export type ErrorCode =
   | 'rate_limited'
   | 'invalid_attestation'
   | 'binding_revoked'
+  | 'account_disabled'
   | 'binding_expired'
   | 'binding_not_ready'
   | 'agent_already_bound'
@@ -86,6 +87,19 @@ export class TrustError extends Error {
   }
   static bindingRevoked(message = 'Binding has been revoked') {
     return new TrustError('binding_revoked', message, 403);
+  }
+  /**
+   * §8.4 owner kill-switch — the human account is disabled, so the
+   * attestor refuses to mint for ANY of its bindings. 403 (not 401):
+   * authenticated-but-forbidden, the same family as `binding_revoked`,
+   * so a consuming service treats it like a revocation rather than a
+   * re-auth prompt. NOTE: this only stops NEW issuance; attestations
+   * already minted stay valid until their `exp` (≤ §10.2 ceiling).
+   */
+  static accountDisabled(
+    message = 'This account has been disabled; visit /account to re-enable or contact the operator',
+  ) {
+    return new TrustError('account_disabled', message, 403);
   }
   static bindingExpired(message = 'Binding token has expired; re-link the agent') {
     return new TrustError('binding_expired', message, 410);

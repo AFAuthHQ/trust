@@ -2,10 +2,19 @@ import type { Context, MiddlewareHandler } from 'hono';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import { TrustError } from './errors.js';
 import { generateToken, hashToken } from './tokens.js';
-import type { HumanRecord, Store } from './store/index.js';
+import type { HumanRecord, SessionRecord, Store } from './store/index.js';
 
 const SESSION_COOKIE = 'trust_sess';
 export const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+
+/**
+ * §7.5 freshness floor for owner-binding operations performed from the
+ * dashboard (e.g. re-enabling a disabled account). A session older than
+ * this must re-authenticate before it can perform the operation, so a
+ * stolen long-lived session cookie cannot silently undo a defensive
+ * action. 300s is the top of the §7.5 60–300s band.
+ */
+export const OWNER_ACTION_FRESHNESS_SECONDS = 300;
 
 export interface SessionContext {
   human: HumanRecord;
@@ -62,6 +71,21 @@ export async function currentHuman(
   const session = await store.getSessionByTokenHash(hashToken(raw));
   if (!session) return null;
   return store.getHumanById(session.human_id);
+}
+
+/**
+ * Reads the session cookie and resolves the raw session record (not the
+ * human), or null if no valid session. Callers that need the session's
+ * `created_at` to enforce a §7.5 freshness floor use this; everything
+ * else should use `currentHuman`.
+ */
+export async function currentSession(
+  c: Context,
+  store: Store,
+): Promise<SessionRecord | null> {
+  const raw = getCookie(c, SESSION_COOKIE);
+  if (!raw) return null;
+  return store.getSessionByTokenHash(hashToken(raw));
 }
 
 /**

@@ -51,6 +51,18 @@ export function createTokenRoutes(deps: { store: Store; redis: Redis; vault: Key
         throw TrustError.bindingExpired();
       }
 
+      // §8.4 human-level kill-switch: a disabled owner cannot mint for
+      // ANY of their bindings. Checked before the quota incr below so a
+      // disabled account consumes no rate-limit allowance. A missing
+      // human is referential corruption (binding.human_id is an FK),
+      // not an owner-disabled state — surface it rather than masking it
+      // as a benign disable.
+      const human = await store.getHumanById(binding.human_id);
+      if (!human) {
+        throw TrustError.internal('Binding references a missing human record');
+      }
+      if (human.disabled_at) throw TrustError.accountDisabled();
+
       // Per-binding daily quota.
       const dayKey = `token:binding:${binding.id}:${new Date().toISOString().slice(0, 10)}`;
       const dayCount = await redis.incr(dayKey);

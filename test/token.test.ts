@@ -173,6 +173,50 @@ describe('POST /v1/token — §10 attestation issuance', () => {
     );
   });
 
+  it('refuses to mint for a disabled human (account_disabled, 403)', async () => {
+    const { binding_token, human } = await setupLinked();
+    await h.store.setHumanDisabled(human.id, true);
+    const r = await postJson(
+      h.app,
+      '/v1/token',
+      { aud: 'did:web:svc.example' },
+      { headers: { authorization: `Bearer ${binding_token}` } },
+    );
+    expect(r.status).toBe(403);
+    expect(((await r.json()) as { error: { code: string } }).error.code).toBe(
+      'account_disabled',
+    );
+  });
+
+  it('re-enabling a disabled human restores minting (reversible kill-switch)', async () => {
+    const { binding_token, human } = await setupLinked();
+    const mint = () =>
+      postJson(
+        h.app,
+        '/v1/token',
+        { aud: 'did:web:svc.example' },
+        { headers: { authorization: `Bearer ${binding_token}` } },
+      );
+    expect((await mint()).status).toBe(200);
+    await h.store.setHumanDisabled(human.id, true);
+    expect((await mint()).status).toBe(403);
+    await h.store.setHumanDisabled(human.id, false);
+    expect((await mint()).status).toBe(200);
+  });
+
+  it('a disabled human consumes no per-binding quota (check precedes redis.incr)', async () => {
+    const { binding_token, binding_id, human } = await setupLinked();
+    await h.store.setHumanDisabled(human.id, true);
+    await postJson(
+      h.app,
+      '/v1/token',
+      { aud: 'did:web:svc.example' },
+      { headers: { authorization: `Bearer ${binding_token}` } },
+    );
+    const dayKey = `token:binding:${binding_id}:${new Date().toISOString().slice(0, 10)}`;
+    expect(await h.redis.get(dayKey)).toBeNull();
+  });
+
   it('returns binding_expired (410) — distinct from binding_revoked (403)', async () => {
     const { binding_token, binding_id } = await setupLinked();
     // Hand-set expires_at to the past via the store.
