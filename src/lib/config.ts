@@ -8,6 +8,16 @@ const ConfigSchema = z.object({
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
 
+  /**
+   * §10.7: maximum §10 attestation mints per binding per UTC day,
+   * across all audiences. Sized for the attested-session re-mint
+   * cadence — an agent keeps a fresh attestation on file per service
+   * and re-mints ~100×/service/day at the 900s TTL ceiling, so a
+   * binding on many `attested_only` services needs well above the old
+   * 1,000. Raise it further for very high service fan-out.
+   */
+  TRUST_PER_BINDING_DAILY_TOKEN_LIMIT: z.coerce.number().int().positive().default(10000),
+
   TRUST_SESSION_SECRET: z.string().min(32),
   TRUST_ADMIN_SECRET: z.string().min(16),
   /**

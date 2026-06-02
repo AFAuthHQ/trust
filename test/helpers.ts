@@ -45,7 +45,7 @@ export interface TestHarness {
 }
 
 export async function createTestHarness(
-  opts: { googleOauthDeps?: GoogleOauthDeps } = {},
+  opts: { googleOauthDeps?: GoogleOauthDeps; perBindingDailyTokenLimit?: number } = {},
 ): Promise<TestHarness> {
   setTestEnv();
   const store = new MemoryStore();
@@ -57,6 +57,7 @@ export async function createTestHarness(
     store,
     redis,
     vault,
+    perBindingDailyTokenLimit: opts.perBindingDailyTokenLimit,
     googleOauthDeps: opts.googleOauthDeps,
   });
   return { app, store, redis, vault };

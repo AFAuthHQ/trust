@@ -272,6 +272,55 @@ describe('POST /v1/token — §10 attestation issuance', () => {
     );
   });
 
+  it('allows up to the raised per-binding daily limit, then throttles (429 rate_limited, not revocation)', async () => {
+    const { binding_token, binding_id } = await setupLinked();
+    const dayKey = `token:binding:${binding_id}:${new Date().toISOString().slice(0, 10)}`;
+    // Preset the counter to one below the 10,000 default so the next two
+    // mints straddle the boundary. (At the old 1,000 limit the first mint
+    // here would already 429 — this pins the raised default, §10.7.)
+    await h.redis.set(dayKey, '9999');
+
+    const ok = await postJson(
+      h.app,
+      '/v1/token',
+      { aud: 'did:web:svc.example' },
+      { headers: { authorization: `Bearer ${binding_token}` } },
+    );
+    expect(ok.status).toBe(200); // count → 10,000, not over the limit
+
+    const throttled = await postJson(
+      h.app,
+      '/v1/token',
+      { aud: 'did:web:svc.example' },
+      { headers: { authorization: `Bearer ${binding_token}` } },
+    );
+    expect(throttled.status).toBe(429); // count → 10,001 > 10,000
+    expect(((await throttled.json()) as { error: { code: string } }).error.code).toBe(
+      'rate_limited',
+    );
+  });
+
+  it('honours an injected per-binding daily limit (configurability)', async () => {
+    const lh = await createTestHarness({ perBindingDailyTokenLimit: 1 });
+    const kp = await createAgentKeypair();
+    const startResp = await postJson(lh.app, '/v1/link/start', {
+      agent_did: kp.did,
+      agent_pubkey_b64: kp.publicKeyB64,
+    });
+    const { req_id } = (await startResp.json()) as { req_id: string };
+    const human = await lh.store.upsertHuman({ primary_email: 'limit@example.com' });
+    await lh.store.recordVerification(human.id, 'email', 'magic-link');
+    const confirmed = await confirmLinkRequest({
+      store: lh.store,
+      redis: lh.redis,
+      human,
+      reqId: req_id,
+    });
+    const auth = { headers: { authorization: `Bearer ${confirmed.binding_token}` } };
+    expect((await postJson(lh.app, '/v1/token', { aud: 'did:web:svc.example' }, auth)).status).toBe(200);
+    expect((await postJson(lh.app, '/v1/token', { aud: 'did:web:svc.example' }, auth)).status).toBe(429);
+  });
+
   it('different requests for different audiences are scoped per audience', async () => {
     const { binding_token } = await setupLinked();
     const r1 = await postJson(
