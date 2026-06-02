@@ -174,7 +174,7 @@ describe('AFAP-0006 §10.5 — one active human binding per agent DID', () => {
     return confirmLinkRequest({
       store: h.store,
       redis: h.redis,
-      human: { id: human.id, primary_email: human.primary_email, created_at: new Date(), disabled_at: null },
+      human: { id: human.id, primary_email: human.primary_email, created_at: new Date(), paused_at: null },
       reqId: lr.id,
     });
   }

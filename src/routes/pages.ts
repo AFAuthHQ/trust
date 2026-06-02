@@ -196,38 +196,38 @@ export function createPageRoutes(deps: { store: Store; redis: Redis }): Hono {
     return c.redirect('/account');
   });
 
-  // ------ POST /account/disable -------------------------------------
+  // ------ POST /account/pause ---------------------------------------
   // Owner kill-switch (§8.4). Protective action — kept low-friction
   // for emergencies, so it only requires a valid session.
-  app.post('/account/disable', async (c) => {
+  app.post('/account/pause', async (c) => {
     const human = await currentHuman(c, store);
     if (!human) return c.redirect('/signin?next=%2Faccount');
-    await store.setHumanDisabled(human.id, true);
+    await store.setHumanPaused(human.id, true);
     getLogger().info(
-      { event: 'owner.account.disabled', human_id: human.id },
-      'account disabled by owner',
+      { event: 'owner.account.paused', human_id: human.id },
+      'account paused by owner',
     );
     return c.redirect('/account');
   });
 
-  // ------ POST /account/enable --------------------------------------
-  // Re-enabling restores the account's ability to authenticate, so it
+  // ------ POST /account/resume --------------------------------------
+  // Resuming restores the account's ability to authenticate, so it
   // is an owner-binding operation subject to the §7.5 freshness floor:
   // a stale (e.g. stolen long-lived) session must re-authenticate first,
-  // or it could silently undo a defensive disable. Disable stays
-  // low-friction; enable does not.
-  app.post('/account/enable', async (c) => {
+  // or it could silently undo a defensive pause. Pause stays
+  // low-friction; resume does not.
+  app.post('/account/resume', async (c) => {
     const session = await currentSession(c, store);
     if (!session) return c.redirect('/signin?next=%2Faccount');
     const ageMs = Date.now() - session.created_at.getTime();
     if (ageMs > OWNER_ACTION_FRESHNESS_SECONDS * 1000) {
-      // Stale session — force a fresh sign-in before re-enabling.
+      // Stale session — force a fresh sign-in before resuming.
       return c.redirect('/signin?next=%2Faccount');
     }
-    await store.setHumanDisabled(session.human_id, false);
+    await store.setHumanPaused(session.human_id, false);
     getLogger().info(
-      { event: 'owner.account.enabled', human_id: session.human_id },
-      'account re-enabled by owner',
+      { event: 'owner.account.resumed', human_id: session.human_id },
+      'account resumed by owner',
     );
     return c.redirect('/account');
   });

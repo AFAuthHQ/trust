@@ -60,15 +60,15 @@ export class MemoryStore implements Store {
       id: randomUUID(),
       primary_email: canonicalizeEmail(input.primary_email),
       created_at: new Date(),
-      disabled_at: null,
+      paused_at: null,
     };
     this.humans.set(h.id, h);
     return h;
   }
-  async setHumanDisabled(human_id: string, disabled: boolean) {
+  async setHumanPaused(human_id: string, paused: boolean) {
     const h = this.humans.get(human_id);
     if (!h) return null;
-    h.disabled_at = disabled ? new Date() : null;
+    h.paused_at = paused ? new Date() : null;
     return h;
   }
 

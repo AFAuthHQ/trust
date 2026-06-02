@@ -178,7 +178,7 @@ describe('end-to-end loopback: browser-simulated hit reaches the agent', () => {
         id: human.id,
         primary_email: human.primary_email,
         created_at: new Date(),
-        disabled_at: null,
+        paused_at: null,
       },
       reqId: lr.id,
     });

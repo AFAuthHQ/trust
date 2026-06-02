@@ -177,30 +177,29 @@ export function accountPage(opts: {
         )}
 
     <h2>Account status</h2>
-    ${human.disabled_at
+    ${human.paused_at
       ? html`
           <div class="card">
             <div class="card-row">
               <div>
-                <strong>Disabled</strong>
-                <span class="pill pill-warn">disabled</span>
+                <strong>Paused</strong>
+                <span class="pill pill-warn">paused</span>
                 <div class="meta">
-                  Disabled ${human.disabled_at.toISOString().slice(0, 10)}.
+                  Paused ${human.paused_at.toISOString().slice(0, 10)}.
                   The attestor issues no new tokens for any of your agents
-                  while this account is disabled. Tokens minted before you
-                  disabled may stay valid at services until they expire
-                  (max 15 min).
+                  while paused. Tokens minted before you paused may stay
+                  valid at services until they expire (max 15 min).
                 </div>
                 <div class="meta">
-                  Re-enabling requires a fresh sign-in, and it restores
+                  Resuming requires a fresh sign-in, and it restores
                   minting for <strong>every agent you have not individually
                   revoked</strong>. If an agent was compromised, revoke it
-                  (above) <strong>before</strong> re-enabling — revoke is
-                  permanent; re-enable is not.
+                  (above) <strong>before</strong> resuming — revoke is
+                  permanent; pause is not.
                 </div>
               </div>
-              <form method="post" action="/account/enable" style="margin: 0;">
-                <button type="submit" class="btn">Re-enable account</button>
+              <form method="post" action="/account/resume" style="margin: 0;">
+                <button type="submit" class="btn">Resume</button>
               </form>
             </div>
           </div>
@@ -212,21 +211,21 @@ export function accountPage(opts: {
                 <strong>Active</strong>
                 <span class="pill pill-ok">active</span>
                 <div class="meta">
-                  Suspect a compromise? Disabling immediately stops the
+                  Suspect a compromise? Pausing immediately stops the
                   attestor from issuing new tokens for every agent linked
                   to this account at once. Already-issued tokens stay valid
-                  until they expire (max 15 min). You can re-enable anytime.
+                  until they expire (max 15 min). You can resume anytime.
                 </div>
                 <div class="meta">
                   If only one agent is compromised, <strong>Revoke that agent
                   above</strong> instead — revoke is permanent, whereas
-                  re-enabling restores minting for every agent you did not
-                  revoke. Disable is a temporary blanket pause, not a fix for
+                  resuming restores minting for every agent you did not
+                  revoke. Pausing is a temporary blanket stop, not a fix for
                   a stolen key.
                 </div>
               </div>
-              <form method="post" action="/account/disable" style="margin: 0;">
-                <button type="submit" class="btn btn-danger">Disable account</button>
+              <form method="post" action="/account/pause" style="margin: 0;">
+                <button type="submit" class="btn btn-danger">Pause all agents</button>
               </form>
             </div>
           </div>

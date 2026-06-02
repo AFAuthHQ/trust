@@ -173,9 +173,9 @@ describe('POST /v1/token — §10 attestation issuance', () => {
     );
   });
 
-  it('refuses to mint for a disabled human (account_disabled, 403)', async () => {
+  it('refuses to mint for a paused human (account_paused, 403)', async () => {
     const { binding_token, human } = await setupLinked();
-    await h.store.setHumanDisabled(human.id, true);
+    await h.store.setHumanPaused(human.id, true);
     const r = await postJson(
       h.app,
       '/v1/token',
@@ -184,11 +184,11 @@ describe('POST /v1/token — §10 attestation issuance', () => {
     );
     expect(r.status).toBe(403);
     expect(((await r.json()) as { error: { code: string } }).error.code).toBe(
-      'account_disabled',
+      'account_paused',
     );
   });
 
-  it('re-enabling a disabled human restores minting (reversible kill-switch)', async () => {
+  it('resuming a paused human restores minting (reversible kill-switch)', async () => {
     const { binding_token, human } = await setupLinked();
     const mint = () =>
       postJson(
@@ -198,13 +198,13 @@ describe('POST /v1/token — §10 attestation issuance', () => {
         { headers: { authorization: `Bearer ${binding_token}` } },
       );
     expect((await mint()).status).toBe(200);
-    await h.store.setHumanDisabled(human.id, true);
+    await h.store.setHumanPaused(human.id, true);
     expect((await mint()).status).toBe(403);
-    await h.store.setHumanDisabled(human.id, false);
+    await h.store.setHumanPaused(human.id, false);
     expect((await mint()).status).toBe(200);
   });
 
-  it('a per-binding revoke survives a disable/enable cycle — re-enable does not re-arm a revoked agent', async () => {
+  it('a per-binding revoke survives a pause/resume cycle — resume does not re-arm a revoked agent', async () => {
     // Two agents under ONE human: A (healthy) and B (compromised).
     const a = await setupLinked({ email: 'owner@example.com' });
     const b = await setupLinked({ email: 'owner@example.com' });
@@ -222,16 +222,16 @@ describe('POST /v1/token — §10 attestation issuance', () => {
     expect((await mint(b.binding_token)).status).toBe(200);
 
     // Owner permanently revokes the compromised agent B, then uses the
-    // reversible blanket kill-switch (disable -> re-enable) during recovery.
+    // reversible blanket kill-switch (pause -> resume) during recovery.
     await h.store.revokeBinding(b.binding_id, a.human.id);
-    await h.store.setHumanDisabled(a.human.id, true);
-    await h.store.setHumanDisabled(a.human.id, false);
+    await h.store.setHumanPaused(a.human.id, true);
+    await h.store.setHumanPaused(a.human.id, false);
 
-    // Healthy agent A is restored by the re-enable...
+    // Healthy agent A is restored by the resume...
     expect((await mint(a.binding_token)).status).toBe(200);
 
     // ...but compromised agent B stays locked out: a per-binding revoke is
-    // permanent and is NOT undone by re-enable (no silent re-arm). This is the
+    // permanent and is NOT undone by resume (no silent re-arm). This is the
     // invariant the recovery runbook + dashboard re-arm warning rely on.
     const rb = await mint(b.binding_token);
     expect(rb.status).toBe(403);
@@ -240,9 +240,9 @@ describe('POST /v1/token — §10 attestation issuance', () => {
     );
   });
 
-  it('a disabled human consumes no per-binding quota (check precedes redis.incr)', async () => {
+  it('a paused human consumes no per-binding quota (check precedes redis.incr)', async () => {
     const { binding_token, binding_id, human } = await setupLinked();
-    await h.store.setHumanDisabled(human.id, true);
+    await h.store.setHumanPaused(human.id, true);
     await postJson(
       h.app,
       '/v1/token',

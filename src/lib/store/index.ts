@@ -5,7 +5,7 @@ export interface HumanRecord {
   id: string;
   primary_email: string;
   created_at: Date;
-  disabled_at: Date | null;
+  paused_at: Date | null;
 }
 
 export interface VerificationRecord {
@@ -129,12 +129,12 @@ export interface Store {
   getHumanById(id: string): Promise<HumanRecord | null>;
   upsertHuman(input: CreateHumanInput): Promise<HumanRecord>;
   /**
-   * Set or clear the human-level disable flag (owner kill-switch).
+   * Set or clear the human-level pause flag (owner kill-switch).
    * When set, POST /v1/token refuses to mint for any of this human's
    * bindings (§8.4). Returns the updated record, or null if no such
    * human (mirrors revokeBinding's null-on-miss contract).
    */
-  setHumanDisabled(human_id: string, disabled: boolean): Promise<HumanRecord | null>;
+  setHumanPaused(human_id: string, paused: boolean): Promise<HumanRecord | null>;
 
   // Verifications
   recordVerification(
