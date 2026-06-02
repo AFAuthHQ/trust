@@ -10,7 +10,7 @@ export type ErrorCode =
   | 'rate_limited'
   | 'invalid_attestation'
   | 'binding_revoked'
-  | 'account_disabled'
+  | 'account_paused'
   | 'binding_expired'
   | 'binding_not_ready'
   | 'agent_already_bound'
@@ -96,14 +96,13 @@ export class TrustError extends Error {
    * re-auth prompt. NOTE: this only stops NEW issuance; attestations
    * already minted stay valid until their `exp` (≤ §10.2 ceiling).
    *
-   * The wire code stays `account_disabled` (consumers may switch on it);
-   * only the owner-facing term changed to "pause". Operator-initiated
-   * take-down (a separate, future action) keeps the "disable" framing.
+   * Wire code `account_paused`. Operator-initiated take-down (a separate,
+   * future action) is a distinct concept and would carry its own code.
    */
-  static accountDisabled(
+  static accountPaused(
     message = 'The owner has paused all agents on this account; they can resume it at trust.afauth.org/account',
   ) {
-    return new TrustError('account_disabled', message, 403);
+    return new TrustError('account_paused', message, 403);
   }
   static bindingExpired(message = 'Binding token has expired; re-link the agent') {
     return new TrustError('binding_expired', message, 410);

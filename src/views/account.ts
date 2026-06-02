@@ -177,7 +177,7 @@ export function accountPage(opts: {
         )}
 
     <h2>Account status</h2>
-    ${human.disabled_at
+    ${human.paused_at
       ? html`
           <div class="card">
             <div class="card-row">
@@ -185,7 +185,7 @@ export function accountPage(opts: {
                 <strong>Paused</strong>
                 <span class="pill pill-warn">paused</span>
                 <div class="meta">
-                  Paused ${human.disabled_at.toISOString().slice(0, 10)}.
+                  Paused ${human.paused_at.toISOString().slice(0, 10)}.
                   The attestor issues no new tokens for any of your agents
                   while paused. Tokens minted before you paused may stay
                   valid at services until they expire (max 15 min).
@@ -198,7 +198,7 @@ export function accountPage(opts: {
                   permanent; pause is not.
                 </div>
               </div>
-              <form method="post" action="/account/enable" style="margin: 0;">
+              <form method="post" action="/account/resume" style="margin: 0;">
                 <button type="submit" class="btn">Resume</button>
               </form>
             </div>
@@ -224,7 +224,7 @@ export function accountPage(opts: {
                   a stolen key.
                 </div>
               </div>
-              <form method="post" action="/account/disable" style="margin: 0;">
+              <form method="post" action="/account/pause" style="margin: 0;">
                 <button type="submit" class="btn btn-danger">Pause all agents</button>
               </form>
             </div>

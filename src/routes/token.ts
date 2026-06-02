@@ -68,17 +68,17 @@ export function createTokenRoutes(deps: {
         throw TrustError.bindingExpired();
       }
 
-      // §8.4 human-level kill-switch: a disabled owner cannot mint for
+      // §8.4 human-level kill-switch: a paused owner cannot mint for
       // ANY of their bindings. Checked before the quota incr below so a
-      // disabled account consumes no rate-limit allowance. A missing
+      // paused account consumes no rate-limit allowance. A missing
       // human is referential corruption (binding.human_id is an FK),
-      // not an owner-disabled state — surface it rather than masking it
-      // as a benign disable.
+      // not an owner-paused state — surface it rather than masking it
+      // as a benign pause.
       const human = await store.getHumanById(binding.human_id);
       if (!human) {
         throw TrustError.internal('Binding references a missing human record');
       }
-      if (human.disabled_at) throw TrustError.accountDisabled();
+      if (human.paused_at) throw TrustError.accountPaused();
 
       // Per-binding daily quota.
       const dayKey = `token:binding:${binding.id}:${new Date().toISOString().slice(0, 10)}`;

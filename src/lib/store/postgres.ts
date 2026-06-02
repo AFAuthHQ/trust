@@ -93,10 +93,10 @@ export class PgStore implements Store {
     return toHuman(rows[0]);
   }
 
-  async setHumanDisabled(human_id: string, disabled: boolean): Promise<HumanRecord | null> {
+  async setHumanPaused(human_id: string, paused: boolean): Promise<HumanRecord | null> {
     const { rows } = await this.pool.query(
-      `UPDATE humans SET disabled_at = $2 WHERE id = $1 RETURNING *`,
-      [human_id, disabled ? new Date() : null],
+      `UPDATE humans SET paused_at = $2 WHERE id = $1 RETURNING *`,
+      [human_id, paused ? new Date() : null],
     );
     return rows[0] ? toHuman(rows[0]) : null;
   }
@@ -469,7 +469,7 @@ function toHuman(r: any): HumanRecord {
     id: r.id,
     primary_email: r.primary_email,
     created_at: r.created_at,
-    disabled_at: r.disabled_at,
+    paused_at: r.paused_at,
   };
 }
 
