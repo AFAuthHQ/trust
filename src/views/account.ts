@@ -121,9 +121,10 @@ export function accountPage(opts: {
     ${bindings.filter((b) => !b.revoked_at).length > 0
       ? html`
           <p style="margin: 0 0 12px; font-size: 13px; color: var(--muted);">
-            Revoking takes effect within 15 minutes — that's AFAuth's
-            revocation bound. Tokens already minted before revocation
-            stay valid until they expire (max 15 min).
+            Lost a key or suspect one agent is compromised? Revoke it to
+            cut it off — recovery is per agent. Revoking takes effect
+            within 15 minutes (AFAuth's revocation bound); tokens minted
+            before revocation stay valid until they expire (max 15 min).
           </p>
         `
       : ''}
@@ -167,6 +168,49 @@ export function accountPage(opts: {
             </div>
           `,
         )}
+
+    <h2>Account status</h2>
+    ${human.disabled_at
+      ? html`
+          <div class="card">
+            <div class="card-row">
+              <div>
+                <strong>Disabled</strong>
+                <span class="pill pill-warn">disabled</span>
+                <div class="meta">
+                  Disabled ${human.disabled_at.toISOString().slice(0, 10)}.
+                  The attestor issues no new tokens for any of your agents
+                  while this account is disabled. Tokens minted before you
+                  disabled may stay valid at services until they expire
+                  (max 15 min).
+                </div>
+                <div class="meta">Re-enabling requires a fresh sign-in.</div>
+              </div>
+              <form method="post" action="/account/enable" style="margin: 0;">
+                <button type="submit" class="btn">Re-enable account</button>
+              </form>
+            </div>
+          </div>
+        `
+      : html`
+          <div class="card">
+            <div class="card-row">
+              <div>
+                <strong>Active</strong>
+                <span class="pill pill-ok">active</span>
+                <div class="meta">
+                  Suspect a compromise? Disabling immediately stops the
+                  attestor from issuing new tokens for every agent linked
+                  to this account at once. Already-issued tokens stay valid
+                  until they expire (max 15 min). You can re-enable anytime.
+                </div>
+              </div>
+              <form method="post" action="/account/disable" style="margin: 0;">
+                <button type="submit" class="btn btn-danger">Disable account</button>
+              </form>
+            </div>
+          </div>
+        `}
 
     ${recentTokens.length > 0
       ? html`

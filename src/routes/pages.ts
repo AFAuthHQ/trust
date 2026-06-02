@@ -4,7 +4,8 @@ import { getConfig, getGoogleOauthConfig } from '../lib/config.js';
 import { TrustError } from '../lib/errors.js';
 import type { Store } from '../lib/store/index.js';
 import { verifyLinkRequest } from '../lib/signing.js';
-import { currentHuman } from '../lib/auth.js';
+import { currentHuman, currentSession, OWNER_ACTION_FRESHNESS_SECONDS } from '../lib/auth.js';
+import { getLogger } from '../lib/logger.js';
 import { confirmLinkRequest } from '../lib/link-confirm.js';
 import { layout } from '../views/layout.js';
 import { landingPage } from '../views/landing.js';
@@ -192,6 +193,42 @@ export function createPageRoutes(deps: { store: Store; redis: Redis }): Hono {
     if (!human) return c.redirect('/signin?next=%2Faccount');
     const id = c.req.param('id');
     await store.revokeBinding(id, human.id);
+    return c.redirect('/account');
+  });
+
+  // ------ POST /account/disable -------------------------------------
+  // Owner kill-switch (§8.4). Protective action — kept low-friction
+  // for emergencies, so it only requires a valid session.
+  app.post('/account/disable', async (c) => {
+    const human = await currentHuman(c, store);
+    if (!human) return c.redirect('/signin?next=%2Faccount');
+    await store.setHumanDisabled(human.id, true);
+    getLogger().info(
+      { event: 'owner.account.disabled', human_id: human.id },
+      'account disabled by owner',
+    );
+    return c.redirect('/account');
+  });
+
+  // ------ POST /account/enable --------------------------------------
+  // Re-enabling restores the account's ability to authenticate, so it
+  // is an owner-binding operation subject to the §7.5 freshness floor:
+  // a stale (e.g. stolen long-lived) session must re-authenticate first,
+  // or it could silently undo a defensive disable. Disable stays
+  // low-friction; enable does not.
+  app.post('/account/enable', async (c) => {
+    const session = await currentSession(c, store);
+    if (!session) return c.redirect('/signin?next=%2Faccount');
+    const ageMs = Date.now() - session.created_at.getTime();
+    if (ageMs > OWNER_ACTION_FRESHNESS_SECONDS * 1000) {
+      // Stale session — force a fresh sign-in before re-enabling.
+      return c.redirect('/signin?next=%2Faccount');
+    }
+    await store.setHumanDisabled(session.human_id, false);
+    getLogger().info(
+      { event: 'owner.account.enabled', human_id: session.human_id },
+      'account re-enabled by owner',
+    );
     return c.redirect('/account');
   });
 
