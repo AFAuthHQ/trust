@@ -128,6 +128,13 @@ export interface Store {
   getHumanByEmail(email: string): Promise<HumanRecord | null>;
   getHumanById(id: string): Promise<HumanRecord | null>;
   upsertHuman(input: CreateHumanInput): Promise<HumanRecord>;
+  /**
+   * Set or clear the human-level disable flag (owner kill-switch).
+   * When set, POST /v1/token refuses to mint for any of this human's
+   * bindings (§8.4). Returns the updated record, or null if no such
+   * human (mirrors revokeBinding's null-on-miss contract).
+   */
+  setHumanDisabled(human_id: string, disabled: boolean): Promise<HumanRecord | null>;
 
   // Verifications
   recordVerification(

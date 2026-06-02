@@ -93,6 +93,14 @@ export class PgStore implements Store {
     return toHuman(rows[0]);
   }
 
+  async setHumanDisabled(human_id: string, disabled: boolean): Promise<HumanRecord | null> {
+    const { rows } = await this.pool.query(
+      `UPDATE humans SET disabled_at = $2 WHERE id = $1 RETURNING *`,
+      [human_id, disabled ? new Date() : null],
+    );
+    return rows[0] ? toHuman(rows[0]) : null;
+  }
+
   // -------------------------------------------------------------------
   // Verifications
   // -------------------------------------------------------------------
