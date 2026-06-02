@@ -59,4 +59,30 @@ describe('account kill-switch controls (/account/disable, /account/enable)', () 
     // The kill-switch must NOT be reversible by a stale session.
     expect((await h.store.getHumanById(human.id))?.disabled_at).toBeTruthy();
   });
+
+  // ---- owner-facing wording: "Pause/Resume", not "Disable/Re-enable" ----
+  // The owner self-service kill-switch is framed as a reversible "pause".
+  // The operator take-down on /policy deliberately keeps "Disable account"
+  // (different actor, different intent) — asserted in operator-policy.test.
+
+  const getAccount = (cookie: string) =>
+    h.app.request('/account', { headers: { cookie } });
+
+  it('active account renders the Pause control, not "Disable"/"Re-enable"', async () => {
+    const { cookie } = await signedIn();
+    const body = await (await getAccount(cookie)).text();
+    expect(body).toContain('Pause all agents');
+    expect(body).toContain('You can resume anytime');
+    expect(body).not.toContain('Disable account');
+    expect(body).not.toContain('Re-enable');
+  });
+
+  it('paused account renders "Paused" status + a Resume control', async () => {
+    const { human, cookie } = await signedIn();
+    await h.store.setHumanDisabled(human.id, true);
+    const body = await (await getAccount(cookie)).text();
+    expect(body).toContain('>Paused<');
+    expect(body).toContain('>Resume<');
+    expect(body).not.toContain('Re-enable account');
+  });
 });

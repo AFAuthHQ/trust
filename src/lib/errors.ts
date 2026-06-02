@@ -89,15 +89,19 @@ export class TrustError extends Error {
     return new TrustError('binding_revoked', message, 403);
   }
   /**
-   * §8.4 owner kill-switch — the human account is disabled, so the
+   * §8.4 owner kill-switch — the owner has paused the account, so the
    * attestor refuses to mint for ANY of its bindings. 403 (not 401):
    * authenticated-but-forbidden, the same family as `binding_revoked`,
    * so a consuming service treats it like a revocation rather than a
    * re-auth prompt. NOTE: this only stops NEW issuance; attestations
    * already minted stay valid until their `exp` (≤ §10.2 ceiling).
+   *
+   * The wire code stays `account_disabled` (consumers may switch on it);
+   * only the owner-facing term changed to "pause". Operator-initiated
+   * take-down (a separate, future action) keeps the "disable" framing.
    */
   static accountDisabled(
-    message = 'This account has been disabled; visit /account to re-enable or contact the operator',
+    message = 'The owner has paused all agents on this account; they can resume it at trust.afauth.org/account',
   ) {
     return new TrustError('account_disabled', message, 403);
   }
