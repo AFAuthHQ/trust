@@ -1,14 +1,31 @@
 import { Hono } from 'hono';
 import type Redis from 'ioredis';
+import { getConfig } from '../lib/config.js';
 import { TrustError } from '../lib/errors.js';
 import { getLogger } from '../lib/logger.js';
 import type { KeyVault } from '../lib/keyvault.js';
 import { rateLimit, clientIp } from '../lib/ratelimit.js';
 import { deriveSubH, pseudonymKeyBytes } from '../lib/pseudonym.js';
+import { verifyAgentRequestSignature } from '../lib/request-sig.js';
 import { TokenRequest, type TokenResponse, type VerificationMethod } from '../lib/schemas.js';
 import { mintAttestationJwt } from '../lib/signing.js';
-import type { Store } from '../lib/store/index.js';
+import type { BindingRecord, Store } from '../lib/store/index.js';
 import { hashToken } from '../lib/tokens.js';
+
+/** Canonical `@target-uri` the agent signs for the mint call (§3.1). */
+function tokenEndpointUrl(): string {
+  return `${getConfig().PUBLIC_BASE_URL.replace(/\/$/, '')}/v1/token`;
+}
+
+/** Parse a JSON body from raw bytes; `{}` on empty/invalid (caller validates shape). */
+function bodyJson(raw: Uint8Array): unknown {
+  try {
+    const s = new TextDecoder().decode(raw);
+    return s ? JSON.parse(s) : {};
+  } catch {
+    return {};
+  }
+}
 
 /**
  * §10.7: default per-binding daily attestation mint cap, across all
@@ -51,18 +68,55 @@ export function createTokenRoutes(deps: {
       key: (c) => `token:ip:${clientIp(c)}`,
     }),
     async (c) => {
-      const auth = c.req.header('authorization') ?? '';
-      const m = auth.match(/^Bearer\s+(.+)$/i);
-      if (!m) throw TrustError.unauthorized('Bearer binding token required');
-      const bindingToken = m[1]!;
-
-      const body = TokenRequest.safeParse(await c.req.json().catch(() => ({})));
+      // Read the raw body once: the §5 content-digest is over bytes, and
+      // both auth paths need the parsed `aud`.
+      const rawBody = new Uint8Array(await c.req.arrayBuffer());
+      const body = TokenRequest.safeParse(bodyJson(rawBody));
       if (!body.success) {
         throw TrustError.invalidRequest(`Invalid /v1/token body: ${body.error.message}`);
       }
 
-      const binding = await store.getBindingByTokenHash(hashToken(bindingToken));
-      if (!binding) throw TrustError.unauthorized('Unknown binding token');
+      // Dual-accept (§3.1 migration). The keyless path: the agent signs
+      // the mint request per §5 with its account key, and the attestor
+      // maps the verified `keyid` to a binding — the keypair is the sole
+      // credential, no bearer token. The legacy path: a Bearer
+      // `binding_token`, kept working for one release while clients
+      // migrate. A signed request takes precedence when both are present.
+      const bearer = /^Bearer\s+(.+)$/i.exec(c.req.header('authorization') ?? '');
+      let binding: BindingRecord | null;
+      if (c.req.header('signature-input')) {
+        const { keyid } = await verifyAgentRequestSignature(
+          {
+            method: c.req.method,
+            targetUri: tokenEndpointUrl(),
+            signatureInput: c.req.header('signature-input') ?? null,
+            signature: c.req.header('signature') ?? null,
+            contentDigest: c.req.header('content-digest') ?? null,
+            body: rawBody,
+          },
+          { redis },
+        );
+        binding = await store.findActiveBindingByAgentDid(keyid);
+        if (!binding) {
+          // No active binding: distinguish an owner revoke (→
+          // binding_revoked downstream) from a never-linked key.
+          const latest = await store.findLatestBindingByAgentDid(keyid);
+          if (!latest) {
+            throw TrustError.unauthorized(
+              'No binding for this agent key — link it at trust.afauth.org first',
+            );
+          }
+          binding = latest;
+        }
+      } else if (bearer) {
+        binding = await store.getBindingByTokenHash(hashToken(bearer[1]!));
+        if (!binding) throw TrustError.unauthorized('Unknown binding token');
+      } else {
+        throw TrustError.unauthorized(
+          'Agent request signature (§5) or Bearer binding token required',
+        );
+      }
+
       if (binding.revoked_at) throw TrustError.bindingRevoked();
       if (binding.expires_at.getTime() < Date.now()) {
         throw TrustError.bindingExpired();

@@ -204,6 +204,17 @@ export interface Store {
    */
   findActiveBindingByAgentDid(agent_did: string): Promise<BindingRecord | null>;
   /**
+   * Most recent binding for the agent DID, ANY status (active, expired,
+   * or revoked), or null. Used by the keyless `/v1/token` mint path
+   * (§3.1): after `findActiveBindingByAgentDid` returns null, this lets
+   * the route distinguish "the owner revoked this agent" (→
+   * `binding_revoked`) from "this key was never linked" (→
+   * `unauthorized`). Unlike `findLatestRevokedBindingByAgentDid` it is
+   * NOT scoped to a human — the signed mint call resolves the human FROM
+   * the binding, so it has none to pass.
+   */
+  findLatestBindingByAgentDid(agent_did: string): Promise<BindingRecord | null>;
+  /**
    * Most recent REVOKED binding this human held for the agent DID, or
    * null. Used by /link to warn that re-linking re-enables a key the
    * owner previously revoked. Scoped to the human so one owner's
