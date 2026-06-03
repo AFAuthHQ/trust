@@ -39,10 +39,14 @@ export interface OauthGoogleDeps {
  *
  * The single callback handles five outcomes:
  *  A — sign-in:    no session, sub already known      → log in as known human
- *  B — link:       session, sub unknown               → record verification on session human
+ *  B — link:       session, sub unknown               → record verification + refresh session
  *  C — sign-up:    no session, sub unknown            → create human + session
  *  D — hijack:     session, sub known to other human  → 409
- *  E — idempotent: session, sub known to same human   → refresh + redirect
+ *  E — re-auth:    session, sub known to same human   → refresh verification + session
+ *
+ * Every authenticating outcome (A/B/C/E) ends with a fresh session
+ * cookie, so re-authenticating satisfies the §7.5 freshness floor that
+ * gates owner actions like resuming a paused account.
  */
 export function createOauthGoogleRoutes(deps: OauthGoogleDeps): Hono {
   const { store, redis } = deps;
@@ -169,8 +173,13 @@ export function createOauthGoogleRoutes(deps: OauthGoogleDeps): Hono {
         );
       }
 
-      // Case E — already linked to this session: refresh verified_at,
-      // redirect. recordVerification handles the upsert.
+      // Case E — already linked to this session: refresh verified_at
+      // and mint a fresh session, then redirect. The fresh session is
+      // load-bearing: /account/resume enforces a §7.5 freshness floor,
+      // and it bounces a stale session to /signin WITHOUT clearing the
+      // cookie. Re-authenticating with Google then lands here, so if we
+      // didn't refresh the session the user could never satisfy the
+      // floor — resume would loop back to /signin forever.
       if (existing && sessionHumanId && existing.human_id === sessionHumanId) {
         await store.recordVerification(
           sessionHumanId,
@@ -178,6 +187,8 @@ export function createOauthGoogleRoutes(deps: OauthGoogleDeps): Hono {
           PROVIDER,
           identity.subject,
         );
+        const human = await store.getHumanById(sessionHumanId);
+        if (human) await createSessionCookie(c, store, human);
         return c.redirect(pickNext(pending.next, '/account'));
       }
 
@@ -221,6 +232,10 @@ export function createOauthGoogleRoutes(deps: OauthGoogleDeps): Hono {
             409,
           );
         }
+        // Refresh the session: the human just re-proved control via
+        // Google, so this counts as a fresh auth for the §7.5 floor
+        // (same invariant as Cases A/C/E).
+        await createSessionCookie(c, store, human);
         return c.redirect(pickNext(pending.next, '/account'));
       }
 
