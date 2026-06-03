@@ -29,13 +29,27 @@ export function rateLimit(opts: RateLimitOpts): MiddlewareHandler {
 
 /**
  * Client IP for rate-limit bucketing only — never for any authorization
- * decision. Trusts X-Forwarded-For; safe behind Railway / Cloudflare.
+ * decision.
+ *
+ * X-Forwarded-For is a client-APPENDED list: the leftmost entries are
+ * attacker-controlled, and each trusted proxy appends the address it
+ * observed on the RIGHT. We trust only the entry TRUST_TRUSTED_PROXY_HOPS
+ * from the right (default 1, matching a single edge proxy such as
+ * Railway/Cloudflare). Trusting the leftmost value let an attacker rotate
+ * XFF to mint unlimited buckets and defeat every IP rate limit (audit #6).
+ * TRUST_TRUSTED_PROXY_HOPS MUST NOT exceed the real proxy depth.
  */
 export function clientIp(c: Context): string {
+  const parsed = Number(process.env.TRUST_TRUSTED_PROXY_HOPS ?? '1');
+  const hops = Number.isInteger(parsed) && parsed >= 1 ? parsed : 1;
   const xff = c.req.header('x-forwarded-for');
   if (xff) {
-    const first = xff.split(',')[0]?.trim();
-    if (first) return first;
+    const parts = xff.split(',').map((p) => p.trim()).filter(Boolean);
+    if (parts.length > 0) {
+      const idx = Math.min(parts.length - 1, Math.max(0, parts.length - hops));
+      const pick = parts[idx];
+      if (pick) return pick;
+    }
   }
   return c.req.header('x-real-ip') ?? 'unknown';
 }

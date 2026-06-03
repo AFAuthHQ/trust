@@ -20,6 +20,17 @@ const ConfigSchema = z.object({
 
   TRUST_SESSION_SECRET: z.string().min(32),
   TRUST_ADMIN_SECRET: z.string().min(16),
+
+  /**
+   * Number of trusted reverse proxies between the public internet and
+   * this service. Used to pick the real client IP from the RIGHT of
+   * X-Forwarded-For for rate-limit bucketing (see lib/ratelimit.ts).
+   * Default 1 (a single edge proxy such as Railway/Cloudflare); MUST NOT
+   * exceed the real proxy depth or a client-forged left entry becomes
+   * trusted (audit #6). Read directly from env in ratelimit.ts; declared
+   * here for validation + documentation.
+   */
+  TRUST_TRUSTED_PROXY_HOPS: z.coerce.number().int().min(1).default(1),
   /**
    * Base64 of a 32-byte (256-bit) key-encryption-key used by
    * PgEncryptedKeyVault to wrap signing-key private material at rest.

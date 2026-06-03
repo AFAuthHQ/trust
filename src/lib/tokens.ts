@@ -1,4 +1,4 @@
-import { randomBytes, createHash } from 'node:crypto';
+import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
 
 /**
  * Opaque bearer tokens for sessions, magic links, and bindings.
@@ -25,6 +25,20 @@ export function constantTimeEqualHex(a: string, b: string): boolean {
     diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   }
   return diff === 0;
+}
+
+/**
+ * Constant-time comparison for arbitrary-length secrets (e.g. the admin
+ * bearer). Both inputs are SHA-256'd to a fixed 32-byte length before
+ * comparison, so it neither short-circuits on the first differing byte
+ * nor leaks the secret's length (audit #7). Unlike constantTimeEqualHex
+ * (for equal-length hex digests), this is safe when the attacker controls
+ * the length of one side.
+ */
+export function constantTimeEqual(a: string, b: string): boolean {
+  const ha = createHash('sha256').update(a, 'utf8').digest();
+  const hb = createHash('sha256').update(b, 'utf8').digest();
+  return timingSafeEqual(ha, hb);
 }
 
 function base64UrlEncode(buf: Buffer): string {

@@ -4,6 +4,7 @@ import { getConfig } from '../lib/config.js';
 import { TrustError } from '../lib/errors.js';
 import type { KeyVault } from '../lib/keyvault.js';
 import { MAX_ATTESTATION_TTL_SECONDS } from '../lib/signing.js';
+import { constantTimeEqual } from '../lib/tokens.js';
 
 /**
  * Admin routes — bearer-auth'd by TRUST_ADMIN_SECRET. Intended to be
@@ -40,7 +41,9 @@ export function createAdminRoutes(deps: { vault: KeyVault }): Hono {
     const cfg = getConfig();
     const auth = c.req.header('authorization') ?? '';
     const m = auth.match(/^Bearer\s+(.+)$/i);
-    if (!m || m[1] !== cfg.TRUST_ADMIN_SECRET) {
+    // Constant-time compare so the admin secret can't be recovered via a
+    // timing side-channel on this internet-reachable endpoint (audit #7).
+    if (!m || !constantTimeEqual(m[1]!, cfg.TRUST_ADMIN_SECRET)) {
       throw TrustError.unauthorized('admin bearer required');
     }
     await next();
