@@ -270,16 +270,16 @@ export function accountPage(opts: {
               <p class="modal-agent-label" data-modal-label hidden></p>
               <div class="did" data-modal-did style="color: var(--muted); margin-bottom: 16px;"></div>
               <p style="margin: 0 0 10px;">
-                Revoking <strong>can't be undone</strong>. The attestor
-                immediately stops issuing new tokens for this agent under
-                your identity.
+                Revoking is <strong>permanent</strong> — this link and its
+                token can't be reactivated. The attestor immediately stops
+                issuing new tokens for this agent under your identity.
               </p>
               <ul style="margin: 0; padding-left: 18px; font-size: 14px; color: var(--muted);">
                 <li>Takes effect within 15 minutes (AFAuth's revocation bound).</li>
                 <li>Tokens already minted stay valid at services until they
                     expire (max 15 min).</li>
-                <li>To let this agent act for you again you'd have to link it
-                    again from scratch — a fresh confirmation.</li>
+                <li>To use this agent again you'd re-link it — a new link, not
+                    an undo. If its key leaked, re-key first.</li>
                 <li>Your other agents are unaffected.</li>
               </ul>
               <div class="modal-actions">

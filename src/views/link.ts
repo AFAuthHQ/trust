@@ -7,8 +7,14 @@ export function linkConfirmPage(opts: {
   rawReq: string;
   hasSession: boolean;
   hasEmailVerification: boolean;
+  /**
+   * When this signed-in human previously revoked a binding for the same
+   * agent DID (and none is active now), the revocation time — so we can
+   * warn that re-linking re-enables the same key.
+   */
+  previouslyRevokedAt?: Date | null;
 }) {
-  const { envelope, rawReq, hasSession, hasEmailVerification } = opts;
+  const { envelope, rawReq, hasSession, hasEmailVerification, previouslyRevokedAt } = opts;
   const expiresIn = Math.max(0, envelope.exp - Math.floor(Date.now() / 1000));
   const mins = Math.floor(expiresIn / 60);
 
@@ -37,6 +43,17 @@ export function linkConfirmPage(opts: {
         : html`<div class="did" style="font-size: 16px;">${envelope.agent_did}</div>`}
       <div class="meta">Request expires in ${mins} min</div>
     </div>
+
+    ${previouslyRevokedAt
+      ? html`
+          <div class="card" style="border-color: var(--accent-dim);">
+            <div class="meta" style="color: var(--fg); margin-top: 0;">
+              <strong style="color: var(--accent);">This agent was revoked on ${formatRevokedAt(previouslyRevokedAt)}.</strong>
+              Re-linking the same key re-enables it — if the key was compromised, re-key and link the new identity instead.
+            </div>
+          </div>
+        `
+      : ''}
 
     <div class="card">
       <h3 style="margin-top: 0;">What this agent will be able to do</h3>
@@ -110,4 +127,9 @@ export function linkErrorPage(opts: { message: string }) {
     <p class="lede">${opts.message}</p>
     <p>Ask your agent to start a new link request.</p>
   `;
+}
+
+/** "2026-05-20 18:04:13 UTC" — second precision, explicit zone. */
+function formatRevokedAt(d: Date): string {
+  return `${d.toISOString().slice(0, 19).replace('T', ' ')} UTC`;
 }

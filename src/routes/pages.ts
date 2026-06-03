@@ -98,6 +98,21 @@ export function createPageRoutes(deps: { store: Store; redis: Redis }): Hono {
     const human = await currentHuman(c, store);
     const verifications = human ? await store.listVerifications(human.id) : [];
 
+    // If this human previously revoked a binding for the same agent DID
+    // and none is active now, confirming will mint a NEW binding for the
+    // same key — warn them (esp. if it was revoked due to compromise).
+    let previouslyRevokedAt: Date | null = null;
+    if (human) {
+      const active = await store.findActiveBindingByAgentDid(envelope.agent_did);
+      if (!active) {
+        const revoked = await store.findLatestRevokedBindingByAgentDid(
+          envelope.agent_did,
+          human.id,
+        );
+        previouslyRevokedAt = revoked?.revoked_at ?? null;
+      }
+    }
+
     // Mark this request as "viewed" so /v1/link/poll can advance the
     // CLI from "awaiting_signin" to "awaiting_confirm". TTL matches
     // the remaining link-request lifetime; expiring early just means
@@ -117,6 +132,7 @@ export function createPageRoutes(deps: { store: Store; redis: Redis }): Hono {
           rawReq: raw,
           hasSession: !!human,
           hasEmailVerification: verifications.some((v) => v.method === 'email'),
+          previouslyRevokedAt,
         }),
       }),
     );
