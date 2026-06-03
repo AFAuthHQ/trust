@@ -78,9 +78,11 @@ export const LinkPollPendingResponse = z.object({
 export const LinkPollConfirmedResponse = z.object({
   state: z.literal('confirmed'),
   binding_id: z.string(),
-  /** Opaque bearer token the agent stores and presents to POST /v1/token. */
-  binding_token: z.string(),
-  /** Unix seconds when binding_token stops being accepted. */
+  /**
+   * Unix seconds when the binding expires; the agent must re-link after
+   * this. There is no bearer token — the agent authenticates mints by
+   * signing /v1/token with its account key (§3.1 keyless mint).
+   */
   binding_token_expires_at: z.number().int(),
 });
 

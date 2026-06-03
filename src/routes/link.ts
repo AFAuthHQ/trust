@@ -152,7 +152,7 @@ export function createLinkRoutes(deps: { store: Store; redis: Redis }): Hono {
     });
   });
 
-  // ------ POST /v1/link/poll (agent → binding token) ---------------
+  // ------ POST /v1/link/poll (agent → binding id + expiry) ---------
 
   app.post(
     '/poll',
@@ -196,11 +196,11 @@ export function createLinkRoutes(deps: { store: Store; redis: Redis }): Hono {
         throw TrustError.linkRequestExpired(`Link request is ${lr.state}`);
       }
 
-      // Pop the binding token from Redis exactly once.
+      // Pop the binding info from Redis exactly once.
       const cached = await redis.getdel(`binding-token:${lr.id}`);
       if (!cached) {
         throw TrustError.linkRequestExpired(
-          'Binding token already retrieved or expired',
+          'Binding already retrieved or expired',
         );
       }
       const payload = JSON.parse(cached);

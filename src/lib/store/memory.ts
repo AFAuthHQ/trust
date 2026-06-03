@@ -247,7 +247,7 @@ export class MemoryStore implements Store {
   async createBinding(input: CreateBindingInput) {
     // §10.5 — at most one active binding per agent_did. If one
     // exists for a different human, reject; if for the same human,
-    // refresh in place (re-link to rotate the token).
+    // refresh in place (re-link with a fresh pubkey / expiry).
     const existingActive = await this.findActiveBindingByAgentDid(input.agent_did);
     if (existingActive && existingActive.human_id !== input.human_id) {
       throw TrustError.agentAlreadyBound();
@@ -255,7 +255,6 @@ export class MemoryStore implements Store {
     if (existingActive && existingActive.human_id === input.human_id) {
       existingActive.agent_label = input.agent_label ?? null;
       existingActive.agent_pubkey_b64 = input.agent_pubkey_b64;
-      existingActive.binding_token_hash = input.binding_token_hash;
       existingActive.expires_at = input.expires_at;
       return existingActive;
     }
@@ -265,7 +264,6 @@ export class MemoryStore implements Store {
       agent_did: input.agent_did,
       agent_label: input.agent_label ?? null,
       agent_pubkey_b64: input.agent_pubkey_b64,
-      binding_token_hash: input.binding_token_hash,
       created_at: new Date(),
       expires_at: input.expires_at,
       revoked_at: null,
@@ -273,12 +271,6 @@ export class MemoryStore implements Store {
     };
     this.bindings.set(b.id, b);
     return b;
-  }
-  async getBindingByTokenHash(token_hash: string) {
-    for (const b of this.bindings.values()) {
-      if (b.binding_token_hash === token_hash) return b;
-    }
-    return null;
   }
   async getBindingById(id: string) {
     return this.bindings.get(id) ?? null;

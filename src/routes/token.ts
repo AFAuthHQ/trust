@@ -9,8 +9,7 @@ import { deriveSubH, pseudonymKeyBytes } from '../lib/pseudonym.js';
 import { verifyAgentRequestSignature } from '../lib/request-sig.js';
 import { TokenRequest, type TokenResponse, type VerificationMethod } from '../lib/schemas.js';
 import { mintAttestationJwt } from '../lib/signing.js';
-import type { BindingRecord, Store } from '../lib/store/index.js';
-import { hashToken } from '../lib/tokens.js';
+import type { Store } from '../lib/store/index.js';
 
 /** Canonical `@target-uri` the agent signs for the mint call (§3.1). */
 function tokenEndpointUrl(): string {
@@ -76,45 +75,32 @@ export function createTokenRoutes(deps: {
         throw TrustError.invalidRequest(`Invalid /v1/token body: ${body.error.message}`);
       }
 
-      // Dual-accept (§3.1 migration). The keyless path: the agent signs
-      // the mint request per §5 with its account key, and the attestor
-      // maps the verified `keyid` to a binding — the keypair is the sole
-      // credential, no bearer token. The legacy path: a Bearer
-      // `binding_token`, kept working for one release while clients
-      // migrate. A signed request takes precedence when both are present.
-      const bearer = /^Bearer\s+(.+)$/i.exec(c.req.header('authorization') ?? '');
-      let binding: BindingRecord | null;
-      if (c.req.header('signature-input')) {
-        const { keyid } = await verifyAgentRequestSignature(
-          {
-            method: c.req.method,
-            targetUri: tokenEndpointUrl(),
-            signatureInput: c.req.header('signature-input') ?? null,
-            signature: c.req.header('signature') ?? null,
-            contentDigest: c.req.header('content-digest') ?? null,
-            body: rawBody,
-          },
-          { redis },
-        );
-        binding = await store.findActiveBindingByAgentDid(keyid);
-        if (!binding) {
-          // No active binding: distinguish an owner revoke (→
-          // binding_revoked downstream) from a never-linked key.
-          const latest = await store.findLatestBindingByAgentDid(keyid);
-          if (!latest) {
-            throw TrustError.unauthorized(
-              'No binding for this agent key — link it at trust.afauth.org first',
-            );
-          }
-          binding = latest;
+      // §3.1 keyless mint: the agent authenticates by signing the mint
+      // request per §5 with its account key — the keypair is the sole
+      // credential. The attestor verifies the signature offline (keyid is
+      // a did:key) and maps the verified keyid to a binding.
+      const { keyid } = await verifyAgentRequestSignature(
+        {
+          method: c.req.method,
+          targetUri: tokenEndpointUrl(),
+          signatureInput: c.req.header('signature-input') ?? null,
+          signature: c.req.header('signature') ?? null,
+          contentDigest: c.req.header('content-digest') ?? null,
+          body: rawBody,
+        },
+        { redis },
+      );
+      let binding = await store.findActiveBindingByAgentDid(keyid);
+      if (!binding) {
+        // No active binding: distinguish an owner revoke (→
+        // binding_revoked downstream) from a never-linked key.
+        const latest = await store.findLatestBindingByAgentDid(keyid);
+        if (!latest) {
+          throw TrustError.unauthorized(
+            'No binding for this agent key — link it at trust.afauth.org first',
+          );
         }
-      } else if (bearer) {
-        binding = await store.getBindingByTokenHash(hashToken(bearer[1]!));
-        if (!binding) throw TrustError.unauthorized('Unknown binding token');
-      } else {
-        throw TrustError.unauthorized(
-          'Agent request signature (§5) or Bearer binding token required',
-        );
+        binding = latest;
       }
 
       if (binding.revoked_at) throw TrustError.bindingRevoked();

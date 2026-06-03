@@ -61,7 +61,6 @@ export interface BindingRecord {
   agent_did: string;
   agent_label: string | null;
   agent_pubkey_b64: string;
-  binding_token_hash: string;
   created_at: Date;
   expires_at: Date;
   revoked_at: Date | null;
@@ -91,7 +90,6 @@ export interface CreateBindingInput {
   agent_did: string;
   agent_label?: string;
   agent_pubkey_b64: string;
-  binding_token_hash: string;
   expires_at: Date;
 }
 
@@ -194,7 +192,6 @@ export interface Store {
 
   // Bindings
   createBinding(input: CreateBindingInput): Promise<BindingRecord>;
-  getBindingByTokenHash(token_hash: string): Promise<BindingRecord | null>;
   getBindingById(id: string): Promise<BindingRecord | null>;
   /**
    * AFAP-0006 §10.5 — returns the (at most one) active, unrevoked
