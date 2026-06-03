@@ -61,7 +61,6 @@ export interface BindingRecord {
   agent_did: string;
   agent_label: string | null;
   agent_pubkey_b64: string;
-  binding_token_hash: string;
   created_at: Date;
   expires_at: Date;
   revoked_at: Date | null;
@@ -91,7 +90,6 @@ export interface CreateBindingInput {
   agent_did: string;
   agent_label?: string;
   agent_pubkey_b64: string;
-  binding_token_hash: string;
   expires_at: Date;
 }
 
@@ -194,7 +192,6 @@ export interface Store {
 
   // Bindings
   createBinding(input: CreateBindingInput): Promise<BindingRecord>;
-  getBindingByTokenHash(token_hash: string): Promise<BindingRecord | null>;
   getBindingById(id: string): Promise<BindingRecord | null>;
   /**
    * AFAP-0006 §10.5 — returns the (at most one) active, unrevoked
@@ -203,6 +200,17 @@ export interface Store {
    * race in createBinding.
    */
   findActiveBindingByAgentDid(agent_did: string): Promise<BindingRecord | null>;
+  /**
+   * Most recent binding for the agent DID, ANY status (active, expired,
+   * or revoked), or null. Used by the keyless `/v1/token` mint path
+   * (§3.1): after `findActiveBindingByAgentDid` returns null, this lets
+   * the route distinguish "the owner revoked this agent" (→
+   * `binding_revoked`) from "this key was never linked" (→
+   * `unauthorized`). Unlike `findLatestRevokedBindingByAgentDid` it is
+   * NOT scoped to a human — the signed mint call resolves the human FROM
+   * the binding, so it has none to pass.
+   */
+  findLatestBindingByAgentDid(agent_did: string): Promise<BindingRecord | null>;
   /**
    * Most recent REVOKED binding this human held for the agent DID, or
    * null. Used by /link to warn that re-linking re-enables a key the

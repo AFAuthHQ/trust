@@ -4,7 +4,9 @@ import { Hono } from 'hono';
 import { generateKeyPair, exportJWK } from 'jose';
 import {
   type KeyObject,
+  createHash,
   createPrivateKey,
+  randomBytes,
   sign as cryptoSign,
 } from 'node:crypto';
 import { createApp } from '../src/server.js';
@@ -137,6 +139,55 @@ function base64UrlEncode(buf: Uint8Array): string {
     .replace(/=+$/, '')
     .replace(/\+/g, '-')
     .replace(/\//g, '_');
+}
+
+/**
+ * §3.1 keyless mint helper: build §5 (RFC 9421)-signed headers + body for
+ * a `/v1/token` mint, signed with the agent key. `PUBLIC_BASE_URL` in
+ * tests is `http://localhost:3001` (setTestEnv), so that is the canonical
+ * `@target-uri` the route reconstructs and the agent must sign.
+ */
+export function signMint(
+  priv: KeyObject,
+  did: string,
+  aud: string,
+  over: { nonce?: string; targetUri?: string; created?: number; body?: string } = {},
+): { body: string; headers: Record<string, string> } {
+  const body = over.body ?? JSON.stringify({ aud });
+  const targetUri = over.targetUri ?? 'http://localhost:3001/v1/token';
+  const created = over.created ?? Math.floor(Date.now() / 1000);
+  const expires = created + 60;
+  const nonce = over.nonce ?? randomBytes(8).toString('hex');
+  const digest = `sha-256=:${createHash('sha256').update(body).digest('base64')}:`;
+  const sigParams =
+    `created=${created};expires=${expires};nonce="${nonce}";keyid="${did}";alg="ed25519"`;
+  const canonical =
+    `"@method": POST\n` +
+    `"@target-uri": ${targetUri}\n` +
+    `"content-digest": ${digest}\n` +
+    `"@signature-params": ("@method" "@target-uri" "content-digest");${sigParams}`;
+  const sig = cryptoSign(null, Buffer.from(canonical, 'utf8'), priv);
+  return {
+    body,
+    headers: {
+      'content-type': 'application/json',
+      'content-digest': digest,
+      'signature-input': `sig1=("@method" "@target-uri" "content-digest");${sigParams}`,
+      signature: `sig1=:${Buffer.from(sig).toString('base64')}:`,
+    },
+  };
+}
+
+/** Sign and POST a keyless `/v1/token` mint to the test app. */
+export async function postMint(
+  app: Hono,
+  priv: KeyObject,
+  did: string,
+  aud: string,
+  over: { nonce?: string; targetUri?: string; created?: number; body?: string } = {},
+): Promise<Response> {
+  const s = signMint(priv, did, aud, over);
+  return app.request('/v1/token', { method: 'POST', headers: s.headers, body: s.body });
 }
 
 /** Convenience: post JSON to the test app. */

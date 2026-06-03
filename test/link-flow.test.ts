@@ -85,7 +85,7 @@ describe('link flow — start → confirm → poll', () => {
     expect(r.status).toBe(401);
   });
 
-  it('full flow: confirm → poll → binding token issued exactly once', async () => {
+  it('full flow: confirm → poll → binding info issued exactly once', async () => {
     const { kp, body } = await startLink();
 
     // Simulate the human confirming via the dashboard.
@@ -98,9 +98,10 @@ describe('link flow — start → confirm → poll', () => {
       reqId: body.req_id,
     });
     expect(confirmed.binding_id).toBeTruthy();
-    expect(confirmed.binding_token).toBeTruthy();
+    expect(confirmed.binding_token_expires_at).toBeTruthy();
 
-    // Agent polls and pops the binding token.
+    // Agent polls and pops the binding info (id + expiry; no bearer token —
+    // it authenticates future mints by signing with its account key).
     const sig = await signEd25519(
       kp.privateKey,
       new TextEncoder().encode(body.req_id),
@@ -113,13 +114,15 @@ describe('link flow — start → confirm → poll', () => {
     const polled = (await r.json()) as {
       state: 'confirmed';
       binding_id: string;
-      binding_token: string;
+      binding_token_expires_at: number;
     };
     expect(polled.state).toBe('confirmed');
     expect(polled.binding_id).toBe(confirmed.binding_id);
-    expect(polled.binding_token).toBe(confirmed.binding_token);
+    expect(polled.binding_token_expires_at).toBe(
+      Math.floor(confirmed.binding_token_expires_at.getTime() / 1000),
+    );
 
-    // A second poll should fail — binding_token is delivered once.
+    // A second poll should fail — the binding info is delivered once.
     const r2 = await postJson(h.app, '/v1/link/poll', {
       req_id: body.req_id,
       sig_b64: sig,
@@ -210,15 +213,14 @@ describe('AFAP-0006 §10.5 — one active human binding per agent DID', () => {
     }
   });
 
-  it('allows the same human to re-link the same agent_did (refresh binding token)', async () => {
+  it('allows the same human to re-link the same agent_did (refresh binding in place)', async () => {
     const kp = await createAgentKeypair();
     const alice = await h.store.upsertHuman({ primary_email: 'alice@example.com' });
 
     const first = await linkAs(alice, kp.did, kp.publicKeyB64);
     const second = await linkAs(alice, kp.did, kp.publicKeyB64);
 
-    expect(second.binding_id).toBe(first.binding_id); // same row, refreshed
-    expect(second.binding_token).not.toBe(first.binding_token); // new token
+    expect(second.binding_id).toBe(first.binding_id); // same row, refreshed in place
   });
 
   it('allows a different human to bind after the existing owner revokes', async () => {

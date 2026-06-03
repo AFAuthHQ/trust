@@ -3,6 +3,7 @@ import {
   createAgentKeypair,
   createTestHarness,
   postJson,
+  postMint,
   type TestHarness,
 } from './helpers.js';
 import { confirmLinkRequest } from '../src/lib/link-confirm.js';
@@ -190,13 +191,8 @@ describe('rotation grace period — tokens minted across rotation remain verifia
       reqId: req_id,
     });
 
-    // Mint a token under the original kid.
-    const t1 = await postJson(
-      h.app,
-      '/v1/token',
-      { aud: 'did:web:svc.example' },
-      { headers: { authorization: `Bearer ${confirmed.binding_token}` } },
-    );
+    // Mint a token under the original kid (keyless: signed with kp).
+    const t1 = await postMint(h.app, kp.privateKey, kp.did, 'did:web:svc.example');
     const jwt1 = ((await t1.json()) as { jwt: string }).jwt;
     const kid1 = parseKid(jwt1);
 
@@ -210,12 +206,7 @@ describe('rotation grace period — tokens minted across rotation remain verifia
 
     // The old kid is still the active signer (900s delay), and the
     // JWKS now publishes both. New tokens still go under the old kid.
-    const t2 = await postJson(
-      h.app,
-      '/v1/token',
-      { aud: 'did:web:svc.example' },
-      { headers: { authorization: `Bearer ${confirmed.binding_token}` } },
-    );
+    const t2 = await postMint(h.app, kp.privateKey, kp.did, 'did:web:svc.example');
     const jwt2 = ((await t2.json()) as { jwt: string }).jwt;
     expect(parseKid(jwt2)).toBe(kid1);
   });

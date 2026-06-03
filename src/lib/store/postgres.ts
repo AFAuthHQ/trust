@@ -288,18 +288,16 @@ export class PgStore implements Store {
           throw TrustError.agentAlreadyBound();
         }
         // Same human re-linking — refresh the active binding in place
-        // (rotates the binding_token and pubkey).
+        // (fresh pubkey / expiry).
         const updated = await client.query(
           `UPDATE bindings SET
              agent_label = $1,
              agent_pubkey_b64 = $2,
-             binding_token_hash = $3,
-             expires_at = $4
-           WHERE id = $5 RETURNING *`,
+             expires_at = $3
+           WHERE id = $4 RETURNING *`,
           [
             input.agent_label ?? null,
             input.agent_pubkey_b64,
-            input.binding_token_hash,
             input.expires_at,
             row.id,
           ],
@@ -310,15 +308,14 @@ export class PgStore implements Store {
 
       const inserted = await client.query(
         `INSERT INTO bindings
-           (human_id, agent_did, agent_label, agent_pubkey_b64, binding_token_hash, expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6)
+           (human_id, agent_did, agent_label, agent_pubkey_b64, expires_at)
+         VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
         [
           input.human_id,
           input.agent_did,
           input.agent_label ?? null,
           input.agent_pubkey_b64,
-          input.binding_token_hash,
           input.expires_at,
         ],
       );
@@ -339,14 +336,6 @@ export class PgStore implements Store {
     }
   }
 
-  async getBindingByTokenHash(token_hash: string): Promise<BindingRecord | null> {
-    const { rows } = await this.pool.query(
-      'SELECT * FROM bindings WHERE binding_token_hash = $1',
-      [token_hash],
-    );
-    return rows[0] ? toBinding(rows[0]) : null;
-  }
-
   async getBindingById(id: string): Promise<BindingRecord | null> {
     const { rows } = await this.pool.query('SELECT * FROM bindings WHERE id = $1', [id]);
     return rows[0] ? toBinding(rows[0]) : null;
@@ -355,6 +344,14 @@ export class PgStore implements Store {
   async findActiveBindingByAgentDid(agent_did: string): Promise<BindingRecord | null> {
     const { rows } = await this.pool.query(
       'SELECT * FROM bindings WHERE agent_did = $1 AND revoked_at IS NULL LIMIT 1',
+      [agent_did],
+    );
+    return rows[0] ? toBinding(rows[0]) : null;
+  }
+
+  async findLatestBindingByAgentDid(agent_did: string): Promise<BindingRecord | null> {
+    const { rows } = await this.pool.query(
+      'SELECT * FROM bindings WHERE agent_did = $1 ORDER BY created_at DESC LIMIT 1',
       [agent_did],
     );
     return rows[0] ? toBinding(rows[0]) : null;
@@ -542,7 +539,6 @@ function toBinding(r: any): BindingRecord {
     agent_did: r.agent_did,
     agent_label: r.agent_label,
     agent_pubkey_b64: r.agent_pubkey_b64,
-    binding_token_hash: r.binding_token_hash,
     created_at: r.created_at,
     expires_at: r.expires_at,
     revoked_at: r.revoked_at,

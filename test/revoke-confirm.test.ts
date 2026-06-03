@@ -33,7 +33,6 @@ describe('revoke confirmation modal (/account)', () => {
       agent_did: opts.agent_did,
       agent_label: opts.agent_label,
       agent_pubkey_b64: 'dGVzdC1wdWJrZXk',
-      binding_token_hash: hashToken(generateToken()),
       expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
     });
   }
