@@ -66,7 +66,11 @@ describe('revoke confirmation modal (/account)', () => {
     // The implications the human must see before confirming.
     expect(body).toMatch(/Takes effect within 15 minutes/);
     expect(body).toMatch(/stay valid at services until they\s+expire/);
-    expect(body).toMatch(/link it\s+again from scratch/);
+    // Permanence is scoped to the link/token (which can't be reactivated),
+    // not an absolute "can't be undone" — the agent can be re-linked anew.
+    expect(body).toContain("can't be reactivated");
+    expect(body).not.toContain("can't be undone");
+    expect(body).toMatch(/re-link it/);
     expect(body).toContain('src="/account-confirm.js"');
   });
 
