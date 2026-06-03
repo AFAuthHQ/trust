@@ -297,13 +297,17 @@ describe('GET /auth/google/callback — sign-in / sign-up branches', () => {
     );
     expect(r.status).toBe(302);
     expect(r.headers.get('location')).toBe('/account');
+    // A successful Google auth always leaves a fresh session cookie —
+    // even when the human was already signed in (linking). Keeps the
+    // §7.5 freshness floor satisfiable by re-authenticating.
+    expect(r.headers.get('set-cookie') ?? '').toMatch(/trust_sess=/);
     const vs = await h.store.listVerifications(human.id);
     expect(vs.some((v) => v.method === 'oauth' && v.external_subject === 'google-sub-b')).toBe(
       true,
     );
   });
 
-  it('Case E — idempotent: signed-in human re-clicks Continue with Google → no-op redirect', async () => {
+  it('Case E — re-auth: signed-in human re-clicks Continue with Google → refreshes session', async () => {
     const google = await makeFakeGoogle();
     const h = await freshHarness(google);
     const human = await h.store.upsertHuman({ primary_email: 'alice@example.com' });
@@ -332,6 +336,10 @@ describe('GET /auth/google/callback — sign-in / sign-up branches', () => {
     );
     expect(r.status).toBe(302);
     expect(r.headers.get('location')).toBe('/account');
+    // Re-authenticating refreshes the session (new cookie) so a stale
+    // session can become fresh again — see the resume-loop regression
+    // below. Not a no-op.
+    expect(r.headers.get('set-cookie') ?? '').toMatch(/trust_sess=/);
     // Still exactly one oauth verification — no duplication.
     const vs = await h.store.listVerifications(human.id);
     expect(vs.filter((v) => v.method === 'oauth' && v.provider === 'google')).toHaveLength(1);
@@ -497,6 +505,92 @@ describe('GET /auth/google/callback — sign-in / sign-up branches', () => {
       redirect: 'manual',
     });
     expect(r.status).toBe(400);
+  });
+});
+
+describe('session freshness on re-auth (paused-account resume loop)', () => {
+  /**
+   * Regression for the "resume keeps bouncing me to login" loop.
+   *
+   * /account/resume enforces a §7.5 freshness floor: a session older
+   * than 300s must re-authenticate before it can un-pause the account.
+   * The bounce keeps the existing (stale) session cookie, so when the
+   * user re-authenticates with Google, /start enters linking mode and
+   * the callback lands in Case E (sub already linked to this human).
+   *
+   * Case E used to be a no-op that only refreshed verified_at — it did
+   * NOT mint a new session. So the session stayed stale, resume bounced
+   * again, and the user looped forever, unable to resume. The fix makes
+   * every successful Google auth refresh the session.
+   */
+  it('Google re-auth refreshes a stale session so a paused account can resume (no loop)', async () => {
+    const google = await makeFakeGoogle();
+    const h = await freshHarness(google);
+    const human = await h.store.upsertHuman({ primary_email: 'looper@example.com' });
+    await h.store.recordVerification(human.id, 'oauth', 'google', 'google-sub-loop');
+    await h.store.setHumanPaused(human.id, true);
+
+    // A stale session (> 300s old) — the kind that fails the resume
+    // freshness floor. MemoryStore hands back the live object, so
+    // backdating created_at sticks.
+    const { generateToken, hashToken } = await import('../src/lib/tokens.js');
+    const staleRaw = generateToken();
+    const stale = await h.store.createSession(
+      human.id,
+      hashToken(staleRaw),
+      new Date(Date.now() + 3600_000),
+    );
+    stale.created_at = new Date(Date.now() - 10 * 60 * 1000);
+
+    // Precondition: resuming with the stale session bounces to /signin
+    // and the account stays paused.
+    const bounced = await h.app.request('/account/resume', {
+      method: 'POST',
+      headers: { cookie: `trust_sess=${staleRaw}` },
+      redirect: 'manual',
+    });
+    expect(bounced.status).toBe(302);
+    expect(bounced.headers.get('location')).toContain('/signin');
+    expect((await h.store.getHumanById(human.id))?.paused_at).toBeTruthy();
+
+    // User clicks "Continue with Google". The stale cookie rides along,
+    // so /start records linkingHumanId and the callback hits Case E.
+    const start = await h.app.request('/auth/google/start?next=%2Faccount', {
+      headers: { cookie: `trust_sess=${staleRaw}` },
+      redirect: 'manual',
+    });
+    const url = new URL(start.headers.get('location')!);
+    const idToken = await google.mintIdToken({
+      sub: 'google-sub-loop',
+      email: 'looper@example.com',
+      email_verified: true,
+      nonce: url.searchParams.get('nonce')!,
+    });
+    google.setNextTokenResponse(idToken);
+
+    const cb = await h.app.request(
+      `/auth/google/callback?code=x&state=${url.searchParams.get('state')}`,
+      { headers: { cookie: `trust_sess=${staleRaw}` }, redirect: 'manual' },
+    );
+    expect(cb.status).toBe(302);
+    expect(cb.headers.get('location')).toBe('/account');
+
+    // The fix: the callback mints a FRESH session cookie distinct from
+    // the stale one.
+    const setCookie = cb.headers.get('set-cookie') ?? '';
+    expect(setCookie).toMatch(/trust_sess=/);
+    const freshCookie = setCookie.split(';')[0]!; // "trust_sess=<token>"
+    expect(freshCookie).not.toBe(`trust_sess=${staleRaw}`);
+
+    // With the refreshed session, resume now succeeds — loop broken.
+    const resumed = await h.app.request('/account/resume', {
+      method: 'POST',
+      headers: { cookie: freshCookie },
+      redirect: 'manual',
+    });
+    expect(resumed.status).toBe(302);
+    expect(resumed.headers.get('location')).toBe('/account');
+    expect((await h.store.getHumanById(human.id))?.paused_at).toBeNull();
   });
 });
 
