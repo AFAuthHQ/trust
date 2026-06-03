@@ -203,6 +203,16 @@ export interface Store {
    * race in createBinding.
    */
   findActiveBindingByAgentDid(agent_did: string): Promise<BindingRecord | null>;
+  /**
+   * Most recent REVOKED binding this human held for the agent DID, or
+   * null. Used by /link to warn that re-linking re-enables a key the
+   * owner previously revoked. Scoped to the human so one owner's
+   * revocation history isn't disclosed to another.
+   */
+  findLatestRevokedBindingByAgentDid(
+    agent_did: string,
+    human_id: string,
+  ): Promise<BindingRecord | null>;
   listBindingsByHuman(human_id: string): Promise<BindingRecord[]>;
   revokeBinding(id: string, human_id: string): Promise<BindingRecord | null>;
   touchBindingLastUsed(id: string, when: Date): Promise<void>;

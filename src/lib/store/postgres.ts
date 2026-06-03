@@ -360,6 +360,19 @@ export class PgStore implements Store {
     return rows[0] ? toBinding(rows[0]) : null;
   }
 
+  async findLatestRevokedBindingByAgentDid(
+    agent_did: string,
+    human_id: string,
+  ): Promise<BindingRecord | null> {
+    const { rows } = await this.pool.query(
+      `SELECT * FROM bindings
+       WHERE agent_did = $1 AND human_id = $2 AND revoked_at IS NOT NULL
+       ORDER BY revoked_at DESC LIMIT 1`,
+      [agent_did, human_id],
+    );
+    return rows[0] ? toBinding(rows[0]) : null;
+  }
+
   async listBindingsByHuman(human_id: string): Promise<BindingRecord[]> {
     const { rows } = await this.pool.query(
       'SELECT * FROM bindings WHERE human_id = $1 ORDER BY created_at DESC',

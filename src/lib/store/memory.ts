@@ -289,6 +289,19 @@ export class MemoryStore implements Store {
     }
     return null;
   }
+  async findLatestRevokedBindingByAgentDid(agent_did: string, human_id: string) {
+    return (
+      [...this.bindings.values()]
+        .filter(
+          (b) =>
+            b.agent_did === agent_did &&
+            b.human_id === human_id &&
+            b.revoked_at !== null,
+        )
+        .sort((a, b) => b.revoked_at!.getTime() - a.revoked_at!.getTime())[0] ??
+      null
+    );
+  }
   async listBindingsByHuman(human_id: string) {
     return [...this.bindings.values()]
       .filter((b) => b.human_id === human_id)
