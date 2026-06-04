@@ -183,7 +183,7 @@ describe('GET /auth/google/callback — sign-in / sign-up branches', () => {
 
     const r = await h.app.request(
       `/auth/google/callback?code=fake-code&state=${state}`,
-      { redirect: 'manual' },
+      { redirect: 'manual', headers: { cookie: callbackCookie(start) } },
     );
     expect(r.status).toBe(302);
     expect(r.headers.get('location')).toBe('/account');
@@ -219,7 +219,7 @@ describe('GET /auth/google/callback — sign-in / sign-up branches', () => {
 
     const r = await h.app.request(
       `/auth/google/callback?code=fake&state=${url.searchParams.get('state')}`,
-      { redirect: 'manual' },
+      { redirect: 'manual', headers: { cookie: callbackCookie(start) } },
     );
     expect(r.status).toBe(302);
 
@@ -252,7 +252,7 @@ describe('GET /auth/google/callback — sign-in / sign-up branches', () => {
 
     const r = await h.app.request(
       `/auth/google/callback?code=fake&state=${state}`,
-      { redirect: 'manual' },
+      { redirect: 'manual', headers: { cookie: callbackCookie(start) } },
     );
     expect(r.status).toBe(302);
     expect(r.headers.get('location')).toBe('/account');
@@ -291,7 +291,7 @@ describe('GET /auth/google/callback — sign-in / sign-up branches', () => {
     const r = await h.app.request(
       `/auth/google/callback?code=fake&state=${state}`,
       {
-        headers: { cookie: `trust_sess=${sessionRaw}` },
+        headers: { cookie: callbackCookie(start, `trust_sess=${sessionRaw}`) },
         redirect: 'manual',
       },
     );
@@ -330,7 +330,7 @@ describe('GET /auth/google/callback — sign-in / sign-up branches', () => {
     const r = await h.app.request(
       `/auth/google/callback?code=x&state=${url.searchParams.get('state')}`,
       {
-        headers: { cookie: `trust_sess=${sessionRaw}` },
+        headers: { cookie: callbackCookie(start, `trust_sess=${sessionRaw}`) },
         redirect: 'manual',
       },
     );
@@ -369,7 +369,7 @@ describe('GET /auth/google/callback — sign-in / sign-up branches', () => {
     google.setNextTokenResponse(idToken);
 
     const r = await h.app.request(`/auth/google/callback?code=x&state=${state}`, {
-      headers: { cookie: `trust_sess=${sessionRaw}` },
+      headers: { cookie: callbackCookie(start, `trust_sess=${sessionRaw}`) },
       redirect: 'manual',
     });
     expect(r.status).toBe(409);
@@ -401,7 +401,7 @@ describe('GET /auth/google/callback — sign-in / sign-up branches', () => {
     const r = await h.app.request(
       `/auth/google/callback?code=x&state=${url.searchParams.get('state')}`,
       {
-        headers: { cookie: `trust_sess=${sessionRaw}` },
+        headers: { cookie: callbackCookie(start, `trust_sess=${sessionRaw}`) },
         redirect: 'manual',
       },
     );
@@ -429,7 +429,7 @@ describe('GET /auth/google/callback — sign-in / sign-up branches', () => {
 
     const r = await h.app.request(
       `/auth/google/callback?code=x&state=${url.searchParams.get('state')}`,
-      { redirect: 'manual' },
+      { redirect: 'manual', headers: { cookie: callbackCookie(start) } },
     );
     expect(r.status).toBe(400);
     expect(await h.store.getHumanByEmail('unverified@example.com')).toBeNull();
@@ -440,6 +440,9 @@ describe('GET /auth/google/callback — sign-in / sign-up branches', () => {
     const h = await freshHarness(google);
     const r = await h.app.request('/auth/google/callback?code=x&state=never-issued', {
       redirect: 'manual',
+      // Cookie matches the (bogus) state so we pass the browser-binding
+      // check and exercise the redis state-miss path this test targets.
+      headers: { cookie: 'trust_oauth_state=never-issued' },
     });
     expect(r.status).toBe(400);
   });
@@ -478,11 +481,13 @@ describe('GET /auth/google/callback — sign-in / sign-up branches', () => {
 
     const first = await h.app.request(`/auth/google/callback?code=c&state=${state}`, {
       redirect: 'manual',
+      headers: { cookie: callbackCookie(start) },
     });
     expect(first.status).toBe(302);
 
     const second = await h.app.request(`/auth/google/callback?code=c&state=${state}`, {
       redirect: 'manual',
+      headers: { cookie: callbackCookie(start) },
     });
     expect(second.status).toBe(400);
   });
@@ -503,8 +508,33 @@ describe('GET /auth/google/callback — sign-in / sign-up branches', () => {
 
     const r = await h.app.request(`/auth/google/callback?code=c&state=${state}`, {
       redirect: 'manual',
+      headers: { cookie: callbackCookie(start) },
     });
     expect(r.status).toBe(400);
+  });
+
+  it('rejects a callback lacking the browser state cookie (login-CSRF defence)', async () => {
+    const google = await makeFakeGoogle();
+    const h = await freshHarness(google);
+    // Attacker runs /start in their own browser and harvests code+state.
+    const start = await h.app.request('/auth/google/start', { redirect: 'manual' });
+    const url = new URL(start.headers.get('location')!);
+    const state = url.searchParams.get('state')!;
+    const idToken = await google.mintIdToken({
+      sub: 'attacker-sub',
+      email: 'attacker@example.com',
+      email_verified: true,
+      nonce: url.searchParams.get('nonce')!,
+    });
+    google.setNextTokenResponse(idToken);
+    // Victim's browser is lured to the callback but does NOT carry the
+    // attacker's state cookie → must be rejected (no silent login).
+    const r = await h.app.request(`/auth/google/callback?code=c&state=${state}`, {
+      redirect: 'manual',
+    });
+    expect(r.status).toBe(400);
+    expect(r.headers.get('set-cookie') ?? '').not.toMatch(/trust_sess=/);
+    expect(await h.store.getHumanByEmail('attacker@example.com')).toBeNull();
   });
 });
 
@@ -570,16 +600,18 @@ describe('session freshness on re-auth (paused-account resume loop)', () => {
 
     const cb = await h.app.request(
       `/auth/google/callback?code=x&state=${url.searchParams.get('state')}`,
-      { headers: { cookie: `trust_sess=${staleRaw}` }, redirect: 'manual' },
+      { headers: { cookie: callbackCookie(start, `trust_sess=${staleRaw}`) }, redirect: 'manual' },
     );
     expect(cb.status).toBe(302);
     expect(cb.headers.get('location')).toBe('/account');
 
     // The fix: the callback mints a FRESH session cookie distinct from
-    // the stale one.
-    const setCookie = cb.headers.get('set-cookie') ?? '';
-    expect(setCookie).toMatch(/trust_sess=/);
-    const freshCookie = setCookie.split(';')[0]!; // "trust_sess=<token>"
+    // the stale one. (The callback also emits a trust_oauth_state deletion
+    // cookie, so select the session cookie specifically.)
+    const setCookies = cb.headers.getSetCookie();
+    const sessSetCookie = setCookies.find((sc) => sc.startsWith('trust_sess=')) ?? '';
+    expect(sessSetCookie).toMatch(/trust_sess=/);
+    const freshCookie = sessSetCookie.split(';')[0]!; // "trust_sess=<token>"
     expect(freshCookie).not.toBe(`trust_sess=${staleRaw}`);
 
     // With the refreshed session, resume now succeeds — loop broken.
@@ -637,4 +669,14 @@ async function createBrowserSession(h: TestHarness, humanId: string): Promise<st
   const raw = generateToken();
   await h.store.createSession(humanId, hashToken(raw), new Date(Date.now() + 3600_000));
   return raw;
+}
+
+/**
+ * Extracts the oauth-state cookie that /start sets (login-CSRF binding),
+ * optionally combined with a session cookie, to pass to the callback —
+ * mirroring what a real browser does.
+ */
+function callbackCookie(start: Response, session?: string): string {
+  const stateCookie = (start.headers.get('set-cookie') ?? '').split(';')[0] ?? '';
+  return session ? `${stateCookie}; ${session}` : stateCookie;
 }

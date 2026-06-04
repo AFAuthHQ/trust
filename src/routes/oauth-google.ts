@@ -1,4 +1,5 @@
 import { Hono, type Context } from 'hono';
+import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import type Redis from 'ioredis';
 import { currentHuman, createSessionCookie } from '../lib/auth.js';
 import { getGoogleOauthConfig } from '../lib/config.js';
@@ -19,6 +20,7 @@ import { signinCallbackErrorPage } from '../views/signin.js';
 
 const STATE_TTL_SECONDS = 5 * 60;
 const PROVIDER = 'google';
+const OAUTH_STATE_COOKIE = 'trust_oauth_state';
 
 interface PendingState {
   codeVerifier: string;
@@ -86,6 +88,18 @@ export function createOauthGoogleRoutes(deps: OauthGoogleDeps): Hono {
         STATE_TTL_SECONDS,
       );
 
+      // Bind this flow to the initiating browser: the callback must
+      // present this cookie matching `state` (login-CSRF defence).
+      // SameSite=Lax so it rides the top-level GET redirect back from
+      // Google; not __Host-/Secure-only so dev over http still works.
+      setCookie(c, OAUTH_STATE_COOKIE, state, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'Lax',
+        path: '/auth/google',
+        maxAge: STATE_TTL_SECONDS,
+      });
+
       const client = new GoogleOauthClient(cfg, deps.google);
       const url = client.authorizationUrl({ state, nonce, codeChallenge });
       return c.redirect(url, 302);
@@ -114,6 +128,20 @@ export function createOauthGoogleRoutes(deps: OauthGoogleDeps): Hono {
       const state = c.req.query('state');
       if (!code || !state) {
         return errorPage(c, 'Missing authorization code or state.', 400);
+      }
+
+      // Login-CSRF defence: the state cookie set at /start must match the
+      // returned state, proving this callback lands in the browser that
+      // began the flow (not one an attacker forced here with a harvested
+      // code+state). Consume the cookie either way.
+      const stateCookie = getCookie(c, OAUTH_STATE_COOKIE);
+      deleteCookie(c, OAUTH_STATE_COOKIE, { path: '/auth/google' });
+      if (!stateCookie || stateCookie !== state) {
+        return errorPage(
+          c,
+          'This sign-in attempt could not be verified. Start over below.',
+          400,
+        );
       }
 
       const raw = await redis.get(stateKey(state));
