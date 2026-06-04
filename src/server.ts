@@ -1,6 +1,7 @@
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 import type Redis from 'ioredis';
 import { getConfig } from './lib/config.js';
 import { TrustError } from './lib/errors.js';
@@ -86,6 +87,21 @@ export function createApp(deps: AppDeps): Hono {
       ].join('; '),
     );
   });
+
+  // Cap request bodies before they are buffered into memory. Mint / link
+  // payloads are small JSON, so 256 KB is generous; this blocks
+  // memory-exhaustion DoS via huge bodies.
+  app.use(
+    '*',
+    bodyLimit({
+      maxSize: 256 * 1024,
+      onError: (c) =>
+        c.json(
+          { error: { code: 'payload_too_large', message: 'Request body too large' } },
+          413,
+        ),
+    }),
+  );
 
   app.onError((err, c) => {
     if (err instanceof TrustError) {
