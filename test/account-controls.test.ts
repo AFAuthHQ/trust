@@ -24,7 +24,10 @@ describe('account kill-switch controls (/account/pause, /account/resume)', () =>
   }
 
   const post = (path: string, cookie?: string) =>
-    h.app.request(path, { method: 'POST', headers: cookie ? { cookie } : {} });
+    h.app.request(path, {
+      method: 'POST',
+      headers: { 'sec-fetch-site': 'same-origin', ...(cookie ? { cookie } : {}) },
+    });
 
   it('pause sets paused_at and redirects to /account', async () => {
     const { human, cookie } = await signedIn();

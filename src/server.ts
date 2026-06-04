@@ -1,6 +1,9 @@
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
+import { csrf } from 'hono/csrf';
+import { HTTPException } from 'hono/http-exception';
 import type Redis from 'ioredis';
 import { getConfig } from './lib/config.js';
 import { TrustError } from './lib/errors.js';
@@ -87,7 +90,59 @@ export function createApp(deps: AppDeps): Hono {
     );
   });
 
+  // Cap request bodies before they are buffered into memory. Mint / link
+  // payloads are small JSON, so 256 KB is generous; this blocks
+  // memory-exhaustion DoS via huge bodies.
+  app.use(
+    '*',
+    bodyLimit({
+      maxSize: 256 * 1024,
+      onError: (c) =>
+        c.json(
+          { error: { code: 'payload_too_large', message: 'Request body too large' } },
+          413,
+        ),
+    }),
+  );
+
+  // CSRF protection for cookie-authenticated, state-changing routes
+  // (form posts: /signin, /link/confirm, /account/*, /auth/google/revoke,
+  // /signout). hono/csrf only acts on unsafe methods with a
+  // form/text-plain (or absent) content-type, so the agent JSON API is
+  // untouched; the text/plain content-type variant is what closes the
+  // cross-site bypass against the JSON confirm endpoint. A request is
+  // allowed when it is same-origin (Sec-Fetch-Site: same-origin) or its
+  // Origin matches our public origin. SameSite=Lax cookies already block
+  // the naive cross-site POST; this also closes the cross-subdomain
+  // (*.afauth.org) gap and removes the single-point-of-failure.
+  const publicOrigin = (() => {
+    try {
+      return new URL(getConfig().PUBLIC_BASE_URL).origin;
+    } catch {
+      return undefined;
+    }
+  })();
+  app.use(
+    '*',
+    csrf({
+      origin: (origin, c) => {
+        if (publicOrigin && origin === publicOrigin) return true;
+        try {
+          return origin === new URL(c.req.url).origin;
+        } catch {
+          return false;
+        }
+      },
+    }),
+  );
+
   app.onError((err, c) => {
+    // hono/csrf (and other middleware) reject by throwing an
+    // HTTPException; return its response verbatim rather than masking it
+    // as a generic 500.
+    if (err instanceof HTTPException) {
+      return err.getResponse();
+    }
     if (err instanceof TrustError) {
       return c.json(err.toEnvelope(), { status: err.status as 400 });
     }

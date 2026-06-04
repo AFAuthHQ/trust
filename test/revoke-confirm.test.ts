@@ -114,7 +114,7 @@ describe('revoke confirmation modal (/account)', () => {
     const b = await linkAgent(human.id, { agent_did: 'did:key:z6MkRevokeTest' });
     const r = await h.app.request(`/account/bindings/${b.id}/revoke`, {
       method: 'POST',
-      headers: { cookie },
+      headers: { cookie, 'sec-fetch-site': 'same-origin' },
     });
     expect(r.status).toBe(302);
     expect(r.headers.get('location')).toBe('/account');
