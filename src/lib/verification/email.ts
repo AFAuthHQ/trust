@@ -26,7 +26,13 @@ export async function sendMagicLink(opts: {
   const log = getLogger();
 
   if (cfg.EMAIL_PROVIDER === 'stdout') {
-    log.info({ to: opts.to, link: opts.link }, 'magic link (stdout provider)');
+    // Dev/test only — NODE_ENV=production + stdout is rejected at config
+    // load (see config.ts), so a real magic link can never reach the logs
+    // in production. The link is a live credential, so emit it only at
+    // debug level (the dev `.env` sets LOG_LEVEL=debug); the info line
+    // carries no secret.
+    log.debug({ to: opts.to, link: opts.link }, 'magic link (stdout provider)');
+    log.info({ to: opts.to }, 'magic link generated (stdout provider; link logged at debug)');
     return;
   }
 

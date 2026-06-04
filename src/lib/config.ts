@@ -1,6 +1,27 @@
 import 'dotenv/config';
 import { z } from 'zod';
 
+/**
+ * Known placeholder/example secret values (and common weak ones). The
+ * repo is public, so the `.env.example` placeholders are world-known; a
+ * deployment that boots with one of these has, in effect, no secret.
+ */
+const PLACEHOLDER_SECRET_RE =
+  /change[\s_-]?me|replace[\s_-]?me|placeholder|^changeit$|^changeme$|^secret$|^password$|^example/i;
+
+/**
+ * Returns a human-readable reason a secret is too weak for production,
+ * or null if it is acceptable. Only enforced when NODE_ENV=production
+ * so local/dev/test stay low-friction.
+ */
+function productionSecretIssue(value: string): string | null {
+  if (value.length < 32) return 'must be at least 32 characters in production';
+  if (PLACEHOLDER_SECRET_RE.test(value)) {
+    return 'must not be a placeholder/example value in production';
+  }
+  return null;
+}
+
 const ConfigSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3001),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -142,6 +163,38 @@ const ConfigSchema = z.object({
       path: ['TRUST_E2E_AUTOCONFIRM'],
       message:
         'TRUST_E2E_AUTOCONFIRM must not be enabled when NODE_ENV=production',
+    });
+  }
+
+  // Fail closed on weak/placeholder secrets in production. The base
+  // schema only enforces min(16)/min(32); the published `.env.example`
+  // placeholders satisfy that, so without this guard a copy-paste
+  // deployment would boot with a world-known secret. TRUST_SESSION_SECRET
+  // signs the /link request envelope; TRUST_ADMIN_SECRET gates key
+  // rotation/retire.
+  if (cfg.NODE_ENV === 'production') {
+    for (const key of ['TRUST_SESSION_SECRET', 'TRUST_ADMIN_SECRET'] as const) {
+      const issue = productionSecretIssue(cfg[key]);
+      if (issue) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: `${key} ${issue}`,
+        });
+      }
+    }
+  }
+
+  // Fail closed on the stdout email provider in production. stdout logs
+  // a live magic-link sign-in URL (a credential) and sends no actual
+  // email, so an operator who forgets to set a real provider both breaks
+  // sign-in and leaks account-takeover links into the logs.
+  if (cfg.NODE_ENV === 'production' && cfg.EMAIL_PROVIDER === 'stdout') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['EMAIL_PROVIDER'],
+      message:
+        'EMAIL_PROVIDER must not be "stdout" when NODE_ENV=production (set resend/postmark)',
     });
   }
 });
