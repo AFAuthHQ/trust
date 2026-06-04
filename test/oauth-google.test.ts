@@ -546,7 +546,7 @@ describe('session freshness on re-auth (paused-account resume loop)', () => {
     // and the account stays paused.
     const bounced = await h.app.request('/account/resume', {
       method: 'POST',
-      headers: { cookie: `trust_sess=${staleRaw}` },
+      headers: { cookie: `trust_sess=${staleRaw}`, 'sec-fetch-site': 'same-origin' },
       redirect: 'manual',
     });
     expect(bounced.status).toBe(302);
@@ -585,7 +585,7 @@ describe('session freshness on re-auth (paused-account resume loop)', () => {
     // With the refreshed session, resume now succeeds — loop broken.
     const resumed = await h.app.request('/account/resume', {
       method: 'POST',
-      headers: { cookie: freshCookie },
+      headers: { cookie: freshCookie, 'sec-fetch-site': 'same-origin' },
       redirect: 'manual',
     });
     expect(resumed.status).toBe(302);
@@ -605,7 +605,7 @@ describe('POST /auth/google/revoke', () => {
 
     const r = await h.app.request('/auth/google/revoke', {
       method: 'POST',
-      headers: { cookie: `trust_sess=${sessionRaw}` },
+      headers: { cookie: `trust_sess=${sessionRaw}`, 'sec-fetch-site': 'same-origin' },
       redirect: 'manual',
     });
     expect(r.status).toBe(302);
@@ -622,6 +622,7 @@ describe('POST /auth/google/revoke', () => {
     const h = await freshHarness(google);
     const r = await h.app.request('/auth/google/revoke', {
       method: 'POST',
+      headers: { 'sec-fetch-site': 'same-origin' },
       redirect: 'manual',
     });
     expect(r.status).toBe(302);

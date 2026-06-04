@@ -284,7 +284,7 @@ describe('AFAP-0006 §10.5 — one active human binding per agent DID', () => {
     );
     const signin = await h.app.request('/signin/callback', {
       method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      headers: { 'content-type': 'application/x-www-form-urlencoded', 'sec-fetch-site': 'same-origin' },
       body: `token=${encodeURIComponent(raw)}`,
     });
     const cookie = signin.headers.get('set-cookie')!;
@@ -301,6 +301,7 @@ describe('AFAP-0006 §10.5 — one active human binding per agent DID', () => {
       headers: {
         'content-type': 'application/x-www-form-urlencoded',
         cookie: sessHeader,
+        'sec-fetch-site': 'same-origin',
       },
       body: `req_id=${encodeURIComponent(lr.id)}`,
     });

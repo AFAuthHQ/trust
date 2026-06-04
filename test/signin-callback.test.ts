@@ -44,7 +44,7 @@ describe('GET /signin/callback — consent page (pre-fetch resistant)', () => {
     // Token still consumable via POST after all the GETs.
     const post = await h.app.request('/signin/callback', {
       method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      headers: { 'content-type': 'application/x-www-form-urlencoded', 'sec-fetch-site': 'same-origin' },
       body: `token=${encodeURIComponent(raw)}`,
     });
     expect(post.status).toBe(302);
@@ -56,7 +56,7 @@ describe('GET /signin/callback — consent page (pre-fetch resistant)', () => {
     // Consume via POST.
     await h.app.request('/signin/callback', {
       method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      headers: { 'content-type': 'application/x-www-form-urlencoded', 'sec-fetch-site': 'same-origin' },
       body: `token=${encodeURIComponent(raw)}`,
     });
     // GET now shows the recovery page.
@@ -106,7 +106,7 @@ describe('POST /signin/callback — atomic consume', () => {
     );
     const r = await h.app.request('/signin/callback', {
       method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      headers: { 'content-type': 'application/x-www-form-urlencoded', 'sec-fetch-site': 'same-origin' },
       body: `token=${encodeURIComponent(raw)}`,
     });
     expect(r.status).toBe(302);
@@ -132,13 +132,13 @@ describe('POST /signin/callback — atomic consume', () => {
     );
     const first = await h.app.request('/signin/callback', {
       method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      headers: { 'content-type': 'application/x-www-form-urlencoded', 'sec-fetch-site': 'same-origin' },
       body: `token=${encodeURIComponent(raw)}`,
     });
     expect(first.status).toBe(302);
     const second = await h.app.request('/signin/callback', {
       method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      headers: { 'content-type': 'application/x-www-form-urlencoded', 'sec-fetch-site': 'same-origin' },
       body: `token=${encodeURIComponent(raw)}`,
     });
     expect(second.status).toBe(410);
@@ -154,7 +154,7 @@ describe('POST /signin/callback — atomic consume', () => {
     );
     const r = await h.app.request('/signin/callback', {
       method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      headers: { 'content-type': 'application/x-www-form-urlencoded', 'sec-fetch-site': 'same-origin' },
       body: `token=${encodeURIComponent(raw)}`,
     });
     expect(r.status).toBe(302);

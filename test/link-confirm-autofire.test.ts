@@ -52,7 +52,7 @@ describe('linkConfirmedPage auto-fire (regression for CLI-stuck-on-Waiting bug)'
     );
     const signin = await h.app.request('/signin/callback', {
       method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      headers: { 'content-type': 'application/x-www-form-urlencoded', 'sec-fetch-site': 'same-origin' },
       body: `token=${encodeURIComponent(raw)}`,
     });
     const cookie = signin.headers.get('set-cookie')!.split(';')[0]!;
@@ -67,7 +67,7 @@ describe('linkConfirmedPage auto-fire (regression for CLI-stuck-on-Waiting bug)'
 
     const r = await h.app.request('/link/confirm', {
       method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded', cookie },
+      headers: { 'content-type': 'application/x-www-form-urlencoded', cookie, 'sec-fetch-site': 'same-origin' },
       body: `req_id=${encodeURIComponent(lr.id)}`,
     });
 
@@ -198,7 +198,7 @@ describe('end-to-end loopback: browser-simulated hit reaches the agent', () => {
     );
     const signin = await h.app.request('/signin/callback', {
       method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      headers: { 'content-type': 'application/x-www-form-urlencoded', 'sec-fetch-site': 'same-origin' },
       body: `token=${encodeURIComponent(raw)}`,
     });
     const cookie = signin.headers.get('set-cookie')!.split(';')[0]!;
@@ -213,7 +213,7 @@ describe('end-to-end loopback: browser-simulated hit reaches the agent', () => {
     });
     const r = await h.app.request('/link/confirm', {
       method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded', cookie },
+      headers: { 'content-type': 'application/x-www-form-urlencoded', cookie, 'sec-fetch-site': 'same-origin' },
       body: `req_id=${encodeURIComponent(lr2.id)}`,
     });
     const html = await r.text();

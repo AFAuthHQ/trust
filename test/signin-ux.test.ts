@@ -72,7 +72,7 @@ describe('signin UX — contextual copy + inbox self-heal', () => {
     it('embeds the inbox-poll script with data-next when next is supplied', async () => {
       const r = await h.app.request('/signin', {
         method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded', 'sec-fetch-site': 'same-origin' },
         body: new URLSearchParams({
           email: 'alice@example.com',
           next: '/link?req=abc.def',
@@ -88,7 +88,7 @@ describe('signin UX — contextual copy + inbox self-heal', () => {
     it('falls back to /account in data-next when next is missing', async () => {
       const r = await h.app.request('/signin', {
         method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded', 'sec-fetch-site': 'same-origin' },
         body: new URLSearchParams({ email: 'alice@example.com' }).toString(),
       });
       expect(r.status).toBe(200);
@@ -99,7 +99,7 @@ describe('signin UX — contextual copy + inbox self-heal', () => {
     it('refuses an off-origin next, falling back to /account', async () => {
       const r = await h.app.request('/signin', {
         method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded', 'sec-fetch-site': 'same-origin' },
         body: new URLSearchParams({
           email: 'alice@example.com',
           next: '//evil.example/path',
