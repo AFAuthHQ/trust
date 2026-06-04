@@ -38,8 +38,8 @@ describe('lib/did — did:key payload check', () => {
     expect(didKeyMatchesPubkey(didA, b.publicKeyB64)).toBe(false);
   });
 
-  it('passes through (returns true) for non-did:key methods', () => {
-    expect(didKeyMatchesPubkey('did:web:agent.example', 'anything')).toBe(true);
+  it('is fail-closed for non-did:key methods (returns false)', () => {
+    expect(didKeyMatchesPubkey('did:web:agent.example', 'anything')).toBe(false);
   });
 
   it('returns false on malformed did:key strings', () => {
@@ -70,14 +70,27 @@ describe('POST /v1/link/start — did:key ↔ pubkey enforcement', () => {
     expect(body.error.message).toMatch(/does not match/i);
   });
 
-  it('does not constrain did:web (out-of-band verification)', async () => {
+  it('rejects did:web (did:key agents only)', async () => {
     const h: TestHarness = await createTestHarness();
     const kp = await createAgentKeypair();
     const r = await postJson(h.app, '/v1/link/start', {
       agent_did: 'did:web:agent.example.com',
       agent_pubkey_b64: kp.publicKeyB64,
     });
-    expect(r.status).toBe(200);
+    expect(r.status).toBe(400);
+    const body = (await r.json()) as { error: { code: string; message: string } };
+    expect(body.error.code).toBe('invalid_request');
+    expect(body.error.message).toMatch(/did:key/i);
+  });
+
+  it('rejects a did:key paired with a non-32-byte pubkey', async () => {
+    const h: TestHarness = await createTestHarness();
+    const kp = await createAgentKeypair();
+    const r = await postJson(h.app, '/v1/link/start', {
+      agent_did: kp.did,
+      agent_pubkey_b64: 'AAAA', // decodes to 3 bytes, not 32
+    });
+    expect(r.status).toBe(400);
   });
 });
 

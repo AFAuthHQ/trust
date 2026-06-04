@@ -40,12 +40,21 @@ export function createLinkRoutes(deps: { store: Store; redis: Redis }): Hono {
         );
       }
 
-      // Anti-substitution: if agent_did is a did:key, its payload MUST
-      // match agent_pubkey_b64. Otherwise a malicious caller could
-      // submit someone else's DID alongside its own keypair, then
-      // present a deep link that misleads the human about which agent
-      // they're authorising. did:web and other methods can't be
-      // checked in-band (would require a network fetch) — skipped.
+      // did:key only. did:web (and other methods) can't be verified
+      // in-band, and the mint path is did:key-only anyway, so a did:web
+      // binding would be unmintable yet could squat the per-agent
+      // uniqueness slot or spoof the consent UI (audit M-1). Reject up
+      // front with a clear message.
+      if (!body.data.agent_did.startsWith('did:key:z')) {
+        throw TrustError.invalidRequest(
+          'agent_did must be a did:key:z… value (did:web and other methods are not supported)',
+        );
+      }
+      // Anti-substitution: the did:key payload MUST match
+      // agent_pubkey_b64 (which therefore must be the 32-byte key).
+      // Otherwise a malicious caller could submit someone else's DID
+      // alongside its own keypair and present a deep link that misleads
+      // the human about which agent they're authorising.
       if (!didKeyMatchesPubkey(body.data.agent_did, body.data.agent_pubkey_b64)) {
         throw TrustError.invalidRequest(
           'agent_did did:key payload does not match agent_pubkey_b64',

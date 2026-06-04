@@ -48,12 +48,13 @@ export function decodeDidKey(did: string): Uint8Array {
  * Returns true iff agent_did is a did:key whose payload matches the
  * supplied 32-byte public key (base64url no-pad).
  *
- * For other DID methods (did:web, etc.) — returns true without
- * checking. Verifying those requires a network fetch and is out of
- * scope for the in-band /v1/link/start anti-spoofing pass.
+ * Fail-closed: any non-`did:key` method (did:web, etc.) returns false.
+ * The attestor only supports did:key agents (the mint path is did:key
+ * only), so a non-did:key here is never bindable — returning false avoids
+ * shipping a fail-open check that a future verifier change could weaponise.
  */
 export function didKeyMatchesPubkey(agentDid: string, pubkeyB64: string): boolean {
-  if (!agentDid.startsWith('did:key:z')) return true;
+  if (!agentDid.startsWith('did:key:z')) return false;
   let didBytes: Uint8Array;
   try {
     didBytes = decodeDidKey(agentDid);
