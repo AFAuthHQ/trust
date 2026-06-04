@@ -160,4 +160,21 @@ describe('POST /signin/callback — atomic consume', () => {
     expect(r.status).toBe(302);
     expect(r.headers.get('location')).toBe('/link?req=opaque-jwt-here');
   });
+
+  it('refuses a protocol-relative `next` (open-redirect), falling back to /account', async () => {
+    const raw = generateToken();
+    await h.store.createMagicLink(
+      'redir@example.com',
+      hashToken(raw),
+      new Date(Date.now() + 15 * 60 * 1000),
+      '//evil.example/phish',
+    );
+    const r = await h.app.request('/signin/callback', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', 'sec-fetch-site': 'same-origin' },
+      body: `token=${encodeURIComponent(raw)}`,
+    });
+    expect(r.status).toBe(302);
+    expect(r.headers.get('location')).toBe('/account');
+  });
 });

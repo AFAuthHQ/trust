@@ -7,6 +7,7 @@ import { TrustError } from '../lib/errors.js';
 import { rateLimit, clientIp } from '../lib/ratelimit.js';
 import type { Store } from '../lib/store/index.js';
 import { generateToken, hashToken } from '../lib/tokens.js';
+import { safeNext } from '../lib/safe-next.js';
 import { sendMagicLink } from '../lib/verification/email.js';
 import { clearSessionCookie, createSessionCookie, currentHuman } from '../lib/auth.js';
 import { layout } from '../views/layout.js';
@@ -159,10 +160,10 @@ export function createAuthRoutes(deps: { store: Store; redis: Redis }): Hono {
     await store.recordVerification(human.id, 'email', 'magic-link');
     await createSessionCookie(c, store, human);
 
-    const next =
-      consumed.next_path && consumed.next_path.startsWith('/')
-        ? consumed.next_path
-        : '/account';
+    // safeNext rejects absolute and protocol-relative (`//host`) values,
+    // not just non-`/`-prefixed ones, so a stored `//evil.example` can't
+    // become an open redirect after a legitimate sign-in.
+    const next = safeNext(consumed.next_path) ?? '/account';
     return c.redirect(next);
   });
 

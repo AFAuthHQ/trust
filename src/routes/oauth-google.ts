@@ -12,6 +12,7 @@ import {
   generateState,
 } from '../lib/oauth/google.js';
 import { rateLimit, clientIp } from '../lib/ratelimit.js';
+import { safeNext } from '../lib/safe-next.js';
 import type { Store } from '../lib/store/index.js';
 import { layout } from '../views/layout.js';
 import { signinCallbackErrorPage } from '../views/signin.js';
@@ -316,14 +317,6 @@ function notConfiguredPage(c: Context): Promise<Response> | Response {
 
 function stateKey(state: string): string {
   return `oauth:google:state:${state}`;
-}
-
-/** Only allow same-site relative paths; absolute URLs would be open-redirect. */
-function safeNext(next: string | undefined): string | undefined {
-  if (!next) return undefined;
-  if (!next.startsWith('/') || next.startsWith('//')) return undefined;
-  if (next.length > 200) return undefined;
-  return next;
 }
 
 function pickNext(next: string | undefined, fallback: string): string {
