@@ -312,9 +312,12 @@ export class MemoryStore implements Store {
     b.revoked_at = new Date();
     return b;
   }
-  async touchBindingLastUsed(id: string, when: Date) {
+  async recordBindingUse(id: string, usedAt: Date, expiresAt: Date) {
     const b = this.bindings.get(id);
-    if (b) b.last_used_at = when;
+    if (b) {
+      b.last_used_at = usedAt;
+      b.expires_at = expiresAt;
+    }
   }
 
   // Signing keys

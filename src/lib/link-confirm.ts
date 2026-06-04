@@ -1,14 +1,12 @@
 import type Redis from 'ioredis';
 import { TrustError } from './errors.js';
 import type { HumanRecord, LinkRequestRecord, Store } from './store/index.js';
-import { LINK_REQUEST_TTL_SECONDS } from './signing.js';
-
-const BINDING_TTL_SECONDS = 90 * 24 * 60 * 60; // 90 days
+import { BINDING_IDLE_TTL_SECONDS, LINK_REQUEST_TTL_SECONDS } from './signing.js';
 
 export interface ConfirmLinkResult {
   link_request: LinkRequestRecord;
   binding_id: string;
-  /** Unix seconds when the binding expires (the agent must re-link after). */
+  /** When the binding lapses if left unused; re-armed on each mint (binding inactivity window). */
   binding_token_expires_at: Date;
   callback_url: string | null;
 }
@@ -51,7 +49,7 @@ export async function confirmLinkRequest(args: {
     throw TrustError.agentAlreadyBound();
   }
 
-  const bindingExpires = new Date(Date.now() + BINDING_TTL_SECONDS * 1000);
+  const bindingExpires = new Date(Date.now() + BINDING_IDLE_TTL_SECONDS * 1000);
 
   const binding = await store.createBinding({
     human_id: human.id,

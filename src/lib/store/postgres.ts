@@ -388,8 +388,11 @@ export class PgStore implements Store {
     return rows[0] ? toBinding(rows[0]) : null;
   }
 
-  async touchBindingLastUsed(id: string, when: Date): Promise<void> {
-    await this.pool.query('UPDATE bindings SET last_used_at = $2 WHERE id = $1', [id, when]);
+  async recordBindingUse(id: string, usedAt: Date, expiresAt: Date): Promise<void> {
+    await this.pool.query(
+      'UPDATE bindings SET last_used_at = $2, expires_at = $3 WHERE id = $1',
+      [id, usedAt, expiresAt],
+    );
   }
 
   // -------------------------------------------------------------------

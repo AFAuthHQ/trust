@@ -32,6 +32,12 @@ export const MAX_ATTESTATION_TTL_SECONDS = 900;
 // trip (deliver → notice → click → consent → bounce back) plus a
 // detour to read other mail.
 export const LINK_REQUEST_TTL_SECONDS = 1800;
+// Binding inactivity window. A binding lapses only after this long with
+// no successful mint; it is re-armed to `now + this` on every mint (see
+// recordBindingUse in the §3.1 mint path), so an actively-used binding
+// never expires and only a genuinely idle one does. There is no absolute
+// ceiling — continuous use keeps a binding alive indefinitely.
+export const BINDING_IDLE_TTL_SECONDS = 90 * 24 * 60 * 60; // 90 days idle
 export const ISS = 'afauth-trust';
 
 export async function listPublicJwks(vault: KeyVault): Promise<{ keys: JWK[] }> {

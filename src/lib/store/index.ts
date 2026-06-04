@@ -223,7 +223,12 @@ export interface Store {
   ): Promise<BindingRecord | null>;
   listBindingsByHuman(human_id: string): Promise<BindingRecord[]>;
   revokeBinding(id: string, human_id: string): Promise<BindingRecord | null>;
-  touchBindingLastUsed(id: string, when: Date): Promise<void>;
+  /**
+   * Records a successful mint: bumps `last_used_at` to `usedAt` and
+   * re-arms `expires_at` to `expiresAt` (the binding inactivity window) in one
+   * write. Called on every successful /v1/token mint.
+   */
+  recordBindingUse(id: string, usedAt: Date, expiresAt: Date): Promise<void>;
 
   // Signing keys
   listActiveSigningKeys(): Promise<SigningKeyRecord[]>;

@@ -8,7 +8,7 @@ import { rateLimit, clientIp } from '../lib/ratelimit.js';
 import { deriveSubH, pseudonymKeyBytes } from '../lib/pseudonym.js';
 import { verifyAgentRequestSignature } from '../lib/request-sig.js';
 import { TokenRequest, type TokenResponse, type VerificationMethod } from '../lib/schemas.js';
-import { mintAttestationJwt } from '../lib/signing.js';
+import { BINDING_IDLE_TTL_SECONDS, mintAttestationJwt } from '../lib/signing.js';
 import type { Store } from '../lib/store/index.js';
 
 /** Canonical `@target-uri` the agent signs for the mint call (§3.1). */
@@ -163,7 +163,14 @@ export function createTokenRoutes(deps: {
         subH,
       });
 
-      // Best-effort audit + last-used touch.
+      // Binding inactivity window: re-arm the binding's expiry on every
+      // successful mint, so an actively-used binding never lapses; only
+      // one idle for BINDING_IDLE_TTL_SECONDS does. The expiry check
+      // above precedes this, so an already-expired binding is never
+      // revived by a mint attempt.
+      const bindingExpires = new Date(Date.now() + BINDING_IDLE_TTL_SECONDS * 1000);
+
+      // Best-effort audit + last-used / expiry slide.
       await Promise.all([
         store.logIssuedToken({
           binding_id: binding.id,
@@ -172,13 +179,14 @@ export function createTokenRoutes(deps: {
           kid,
           expires_at: new Date(exp * 1000),
         }),
-        store.touchBindingLastUsed(binding.id, new Date(iat * 1000)),
+        store.recordBindingUse(binding.id, new Date(iat * 1000), bindingExpires),
       ]);
 
       const resp: TokenResponse = {
         jwt,
         expires_at: exp,
         verification,
+        binding_expires_at: Math.floor(bindingExpires.getTime() / 1000),
       };
       return c.json(resp);
     },
