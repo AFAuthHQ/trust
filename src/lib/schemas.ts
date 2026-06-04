@@ -105,6 +105,13 @@ export const TokenResponse = z.object({
   jwt: z.string(),
   expires_at: z.number().int(),
   verification: VerificationMethod,
+  /**
+   * Unix seconds when the binding lapses if left unused. Re-armed to this
+   * on every successful mint (the binding inactivity window), so clients that cache
+   * the binding's expiry SHOULD refresh it from here on each mint rather
+   * than treating the link-time value as a fixed deadline.
+   */
+  binding_expires_at: z.number().int(),
 });
 export type TokenResponse = z.infer<typeof TokenResponse>;
 

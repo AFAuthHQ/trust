@@ -73,6 +73,34 @@ describe('POST /v1/token — §10 attestation issuance (keyless mint)', () => {
     expect(refreshed?.last_used_at).toBeTruthy();
   });
 
+  it('slides the binding expiry forward on each successful mint (inactivity window)', async () => {
+    const { kp, binding_id } = await setupLinked();
+    // Simulate a binding partway through its life: expiry only 2 days out.
+    const bnd = await h.store.getBindingById(binding_id);
+    if (!bnd) throw new Error('binding not found');
+    const before = Date.now() + 2 * 24 * 60 * 60 * 1000;
+    bnd.expires_at = new Date(before);
+
+    expect((await mint(kp, 'did:web:svc.example')).status).toBe(200);
+
+    // Re-armed to ~now + 90d, well beyond the 2-day mark it sat at.
+    const refreshed = await h.store.getBindingById(binding_id);
+    expect(refreshed!.expires_at.getTime()).toBeGreaterThan(before);
+    expect(refreshed!.expires_at.getTime()).toBeGreaterThan(
+      Date.now() + 89 * 24 * 60 * 60 * 1000,
+    );
+  });
+
+  it('returns binding_expires_at in the mint response, reflecting the slid expiry', async () => {
+    const { kp } = await setupLinked();
+    const r = await mint(kp, 'did:web:svc.example');
+    expect(r.status).toBe(200);
+    const body = (await r.json()) as { binding_expires_at: number };
+    expect(body.binding_expires_at).toBeGreaterThan(
+      Math.floor(Date.now() / 1000) + 89 * 24 * 60 * 60,
+    );
+  });
+
   it('requires a signed request — an unsigned POST is rejected', async () => {
     const r = await postJson(h.app, '/v1/token', { aud: 'did:web:svc.example' });
     expect(r.status).toBe(401);
@@ -170,16 +198,23 @@ describe('POST /v1/token — §10 attestation issuance (keyless mint)', () => {
     expect(await h.redis.get(dayKey)).toBeNull();
   });
 
-  it('returns binding_expired (410) — distinct from binding_revoked (403)', async () => {
+  it('returns binding_expired (410) — distinct from binding_revoked (403); a mint attempt does not revive it', async () => {
     const { kp, binding_id } = await setupLinked();
     // Hand-set expires_at to the past via the store.
     const bnd = await h.store.getBindingById(binding_id);
     if (!bnd) throw new Error('binding not found');
-    bnd.expires_at = new Date(Date.now() - 1000);
+    const pastExpiry = new Date(Date.now() - 1000);
+    bnd.expires_at = pastExpiry;
 
     const r = await mint(kp, 'did:web:svc.example');
     expect(r.status).toBe(410);
     expect(((await r.json()) as { error: { code: string } }).error.code).toBe('binding_expired');
+
+    // The expiry check precedes the slide (binding inactivity window): an
+    // already-expired binding is NOT re-armed by a mint attempt — it
+    // stays expired until the human re-links.
+    const after = await h.store.getBindingById(binding_id);
+    expect(after!.expires_at.getTime()).toBe(pastExpiry.getTime());
   });
 
   it('allows up to the raised per-binding daily limit, then throttles (429 rate_limited, not revocation)', async () => {
