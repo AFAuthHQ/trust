@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type Redis from 'ioredis';
 import { getConfig } from '../lib/config.js';
 import { TrustError } from '../lib/errors.js';
-import { rateLimit, clientIp } from '../lib/ratelimit.js';
+import { rateLimit, clientIp, incrFixedWindow } from '../lib/ratelimit.js';
 import {
   LinkPollRequest,
   LinkStartRequest,
@@ -63,15 +63,27 @@ export function createLinkRoutes(deps: { store: Store; redis: Redis }): Hono {
 
       // Per-agent_did cap, prevents agent-side abuse / flood.
       const perAgentKey = `link-start:agent:${body.data.agent_did}`;
-      const perAgentCount = await redis.incr(perAgentKey);
-      if (perAgentCount === 1) await redis.expire(perAgentKey, 3600);
+      const perAgentCount = await incrFixedWindow(redis, perAgentKey, 3600);
       if (perAgentCount > 20) throw TrustError.rateLimited('Too many link requests for this agent');
 
-      // Loopback callback safety: only 127.0.0.1 / localhost allowed.
+      // Loopback callback safety: only http:// on 127.0.0.1 / localhost.
+      // Validate the SCHEME as well as the host — `new URL(...).hostname`
+      // is `localhost` for javascript://localhost/…, https://localhost/…,
+      // ftp://localhost/…, and the value is later reflected into an href
+      // on the "Linked." page. Desktop CLIs only ever serve plain http on
+      // the loopback interface.
       if (body.data.callback_url) {
-        const u = new URL(body.data.callback_url);
-        if (!(u.hostname === '127.0.0.1' || u.hostname === 'localhost')) {
-          throw TrustError.invalidRequest('callback_url must be loopback');
+        let u: URL;
+        try {
+          u = new URL(body.data.callback_url);
+        } catch {
+          throw TrustError.invalidRequest('callback_url must be a valid URL');
+        }
+        const loopback = u.hostname === '127.0.0.1' || u.hostname === 'localhost';
+        if (u.protocol !== 'http:' || !loopback) {
+          throw TrustError.invalidRequest(
+            'callback_url must be an http:// loopback URL (127.0.0.1 or localhost)',
+          );
         }
       }
 

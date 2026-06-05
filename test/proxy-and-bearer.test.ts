@@ -42,6 +42,21 @@ describe('clientIp — X-Forwarded-For trust (audit #6)', () => {
     expect(clientIp(ctxWith({ 'x-forwarded-for': 'forged, 203.0.113.7, 10.0.0.1' }))).toBe('203.0.113.7');
   });
 
+  it('does NOT trust a chain shorter than the configured proxy depth (fails safe)', () => {
+    // hops=2 but only one XFF entry: the request did not traverse the
+    // expected proxies, so the lone entry is attacker-supplied. It must
+    // not be used — previously this fell back to the forged leftmost.
+    process.env.TRUST_TRUSTED_PROXY_HOPS = '2';
+    expect(clientIp(ctxWith({ 'x-forwarded-for': 'spoofed' }))).toBe('unknown');
+  });
+
+  it('a too-short chain falls back to x-real-ip, not the forged XFF', () => {
+    process.env.TRUST_TRUSTED_PROXY_HOPS = '3';
+    expect(
+      clientIp(ctxWith({ 'x-forwarded-for': 'spoofed, alsospoofed', 'x-real-ip': '5.6.7.8' })),
+    ).toBe('5.6.7.8');
+  });
+
   it('falls back to x-real-ip then unknown', () => {
     expect(clientIp(ctxWith({ 'x-real-ip': '5.6.7.8' }))).toBe('5.6.7.8');
     expect(clientIp(ctxWith({}))).toBe('unknown');

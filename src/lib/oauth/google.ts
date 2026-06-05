@@ -119,6 +119,10 @@ export class GoogleOauthClient {
     const { payload: claims } = await jwtVerify(payload.id_token, this.deps.jwks, {
       issuer: this.deps.issuer,
       audience: this.cfg.clientId,
+      // Pin the algorithm: Google ID tokens are RS256. Without this, jose
+      // accepts whatever algorithm the resolved JWKS key advertises — the
+      // one inbound-JWT path not asserting its own alg invariant.
+      algorithms: ['RS256'],
     });
     assertNonce(claims, opts.expectedNonce);
 

@@ -102,6 +102,17 @@ export function createAdminRoutes(deps: { vault: KeyVault; redis: Redis }): Hono
     if (!parsed.success) {
       throw TrustError.invalidRequest(`bad body: ${parsed.error.message}`);
     }
+    // Refuse to retire the last non-retired signing key: with zero live
+    // keys, /.well-known/jwks.json goes empty (every outstanding token
+    // becomes unverifiable) and /v1/token 500s with no key to sign with
+    // until a restart re-bootstraps. Rotate in a replacement first.
+    // (Retiring an already-retired / unknown kid stays an idempotent no-op.)
+    const live = (await vault.list()).filter((k) => k.retiredAt === null);
+    if (live.length <= 1 && live.some((k) => k.kid === parsed.data.kid)) {
+      throw TrustError.conflict(
+        'Refusing to retire the last active signing key — rotate in a replacement first',
+      );
+    }
     await vault.retire(parsed.data.kid);
     return c.json({ ok: true, retired_kid: parsed.data.kid });
   });
