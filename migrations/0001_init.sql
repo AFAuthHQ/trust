@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS signing_keys (
   kid             text PRIMARY KEY,
   alg             text NOT NULL,
   public_jwk      jsonb NOT NULL,
-  private_jwk     jsonb NOT NULL,  -- TODO: move to KMS for production
+  private_jwk     jsonb NOT NULL,  -- superseded by 0002: dropped for private_jwk_enc (AES-256-GCM at rest); KMS vaults are a single-file swap, see lib/keyvault.ts
   created_at      timestamptz NOT NULL DEFAULT now(),
   active_from     timestamptz NOT NULL,
   retired_at      timestamptz

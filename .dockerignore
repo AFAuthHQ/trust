@@ -1,0 +1,15 @@
+# Keep the build context (and image layers) minimal and free of anything
+# secret or irrelevant. The Dockerfile uses explicit scoped COPYs, so this
+# is defense-in-depth + faster builds rather than the only guard.
+.git
+.github
+.env
+.env.*
+!.env.example
+node_modules
+dist
+coverage
+.vitest
+test
+*.log
+.DS_Store

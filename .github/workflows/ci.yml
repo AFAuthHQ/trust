@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+# Least privilege: this workflow only reads the repo and runs tests, so
+# the GITHUB_TOKEN needs no write scopes. Explicit beats relying on the
+# repo/org default once the repository is public.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -17,7 +23,7 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-      - run: pnpm install --frozen-lockfile=false
+      - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
