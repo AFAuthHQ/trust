@@ -147,6 +147,30 @@ describe('POST /admin/keys/retire — removes from JWKS', () => {
     expect(a.status).toBe(200);
     expect(b.status).toBe(200);
   });
+
+  it('refuses to retire the last active signing key (409) so signing + JWKS cannot break', async () => {
+    // Fresh harness bootstraps exactly one key. Retiring it would empty
+    // the JWKS and leave getActive() with nothing to sign with.
+    const before = await h.vault.list();
+    const live = before.filter((k) => k.retiredAt === null);
+    expect(live.length).toBe(1);
+    const onlyKid = live[0]!.kid;
+
+    const r = await postJson(
+      h.app,
+      '/admin/keys/retire',
+      { kid: onlyKid },
+      { headers: { authorization: `Bearer ${ADMIN}` } },
+    );
+    expect(r.status).toBe(409);
+
+    // The key survives and the JWKS still serves it.
+    const after = await h.vault.list();
+    expect(after.filter((k) => k.retiredAt === null).map((k) => k.kid)).toEqual([onlyKid]);
+    const jwks = await h.app.request('/.well-known/jwks.json');
+    const jwksBody = (await jwks.json()) as { keys: Array<{ kid: string }> };
+    expect(jwksBody.keys.map((k) => k.kid)).toEqual([onlyKid]);
+  });
 });
 
 describe('GET /admin/keys — lists current state', () => {

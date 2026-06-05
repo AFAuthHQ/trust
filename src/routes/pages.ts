@@ -53,6 +53,7 @@ export function createPageRoutes(deps: { store: Store; redis: Redis }): Hono {
   // ------ /link (deep-link confirm) ---------------------------------
 
   app.get('/link', async (c) => {
+    c.header('cache-control', 'no-store');
     const raw = c.req.query('req');
     if (!raw) {
       return c.html(
@@ -178,6 +179,7 @@ export function createPageRoutes(deps: { store: Store; redis: Redis }): Hono {
   // ------ /account --------------------------------------------------
 
   app.get('/account', async (c) => {
+    c.header('cache-control', 'no-store');
     const human = await currentHuman(c, store);
     if (!human) return c.redirect('/signin?next=%2Faccount');
 

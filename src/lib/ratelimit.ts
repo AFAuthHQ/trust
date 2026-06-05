@@ -9,13 +9,31 @@ export interface RateLimitOpts {
   key: (c: Context) => string;
 }
 
+/**
+ * Atomically-safe fixed-window counter: INCR the key, then ensure it
+ * carries a TTL. EXPIRE is (re-)applied whenever the key has none — on
+ * the first increment, and also if a crash/disconnect between INCR and
+ * EXPIRE on an earlier request left the key without an expiry. Without
+ * this, such a key would count upward forever and wedge the rate-limit /
+ * quota bucket permanently. Portable across Redis versions (no
+ * `EXPIRE … NX`).
+ */
+export async function incrFixedWindow(
+  redis: Redis,
+  key: string,
+  windowSeconds: number,
+): Promise<number> {
+  const count = await redis.incr(key);
+  if (count === 1 || (await redis.ttl(key)) === -1) {
+    await redis.expire(key, windowSeconds);
+  }
+  return count;
+}
+
 export function rateLimit(opts: RateLimitOpts): MiddlewareHandler {
   return async (c, next) => {
     const k = `ratelimit:${opts.key(c)}`;
-    const count = await opts.redis.incr(k);
-    if (count === 1) {
-      await opts.redis.expire(k, opts.windowSeconds);
-    }
+    const count = await incrFixedWindow(opts.redis, k, opts.windowSeconds);
     if (count > opts.limit) {
       const ttl = await opts.redis.ttl(k);
       c.header('retry-after', String(Math.max(ttl, 0)));
@@ -45,9 +63,14 @@ export function clientIp(c: Context): string {
   const xff = c.req.header('x-forwarded-for');
   if (xff) {
     const parts = xff.split(',').map((p) => p.trim()).filter(Boolean);
-    if (parts.length > 0) {
-      const idx = Math.min(parts.length - 1, Math.max(0, parts.length - hops));
-      const pick = parts[idx];
+    // Trust the entry `hops` from the right ONLY if the chain is at least
+    // that long. A chain shorter than the configured trusted-proxy depth
+    // means the request did not traverse the expected proxies, so every
+    // entry is attacker-supplied — fall through to x-real-ip/unknown
+    // rather than trusting the forged leftmost value (which a too-high
+    // hops setting would otherwise clamp to).
+    if (parts.length >= hops) {
+      const pick = parts[parts.length - hops];
       if (pick) return pick;
     }
   }

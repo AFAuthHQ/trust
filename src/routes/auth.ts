@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { getConfig, getGoogleOauthConfig } from '../lib/config.js';
 import { canonicalizeEmail } from '../lib/email.js';
 import { TrustError } from '../lib/errors.js';
-import { rateLimit, clientIp } from '../lib/ratelimit.js';
+import { rateLimit, clientIp, incrFixedWindow } from '../lib/ratelimit.js';
 import type { Store } from '../lib/store/index.js';
 import { generateToken, hashToken } from '../lib/tokens.js';
 import { safeNext } from '../lib/safe-next.js';
@@ -63,8 +63,7 @@ export function createAuthRoutes(deps: { store: Store; redis: Redis }): Hono {
 
       // Per-email rate limit (loose ceiling for abuse).
       const emailKey = `signin:email:${canonicalizeEmail(parsed.data.email)}`;
-      const emailCount = await redis.incr(emailKey);
-      if (emailCount === 1) await redis.expire(emailKey, 3600);
+      const emailCount = await incrFixedWindow(redis, emailKey, 3600);
       if (emailCount > 10) throw TrustError.rateLimited('Too many signin attempts for this email');
 
       const raw = generateToken();
@@ -112,6 +111,8 @@ export function createAuthRoutes(deps: { store: Store; redis: Redis }): Hono {
   // otherwise burn the link before the human ever sees it. The POST
   // handler below is the only thing that consumes the token.
   app.get('/signin/callback', async (c) => {
+    // Renders the human's email tied to the magic-link token — never cache.
+    c.header('cache-control', 'no-store');
     const token = c.req.query('token');
     if (!token) {
       return c.html(

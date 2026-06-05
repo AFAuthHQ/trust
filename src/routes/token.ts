@@ -4,7 +4,7 @@ import { getConfig } from '../lib/config.js';
 import { TrustError } from '../lib/errors.js';
 import { getLogger } from '../lib/logger.js';
 import type { KeyVault } from '../lib/keyvault.js';
-import { rateLimit, clientIp } from '../lib/ratelimit.js';
+import { rateLimit, clientIp, incrFixedWindow } from '../lib/ratelimit.js';
 import { deriveSubH, pseudonymKeyBytes } from '../lib/pseudonym.js';
 import { verifyAgentRequestSignature } from '../lib/request-sig.js';
 import { TokenRequest, type TokenResponse, type VerificationMethod } from '../lib/schemas.js';
@@ -122,8 +122,7 @@ export function createTokenRoutes(deps: {
 
       // Per-binding daily quota.
       const dayKey = `token:binding:${binding.id}:${new Date().toISOString().slice(0, 10)}`;
-      const dayCount = await redis.incr(dayKey);
-      if (dayCount === 1) await redis.expire(dayKey, 86400);
+      const dayCount = await incrFixedWindow(redis, dayKey, 86400);
       if (dayCount > perBindingDailyLimit) {
         // A throttle is a rate cap, NOT a revocation. Log it so an
         // operator can distinguish "raise TRUST_PER_BINDING_DAILY_TOKEN_LIMIT
