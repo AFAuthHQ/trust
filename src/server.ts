@@ -89,6 +89,11 @@ export function createApp(deps: AppDeps): Hono {
         "base-uri 'self'",
       ].join('; '),
     );
+    // Agent-discovery hint (RFC 8288 Web Linking): advertise the
+    // LLM-friendly markdown index from every response so agents — and the
+    // agent-readiness probes that look for it — can find it without
+    // guessing /llms.txt.
+    c.header('link', '</llms.txt>; rel="alternate"; type="text/markdown"');
   });
 
   // Cap request bodies before they are buffered into memory. Mint / link

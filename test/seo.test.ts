@@ -22,6 +22,19 @@ describe('SEO / discovery routes (robots, llms, sitemap, security.txt)', () => {
     expect(body).toContain('User-agent: ClaudeBot');
     expect(body).toMatch(/Sitemap: https?:\/\/\S+\/sitemap\.xml/);
     expect(body).toContain('Disallow: /admin/');
+    // Content Signals (contentsignals.org): AFAuth opts INTO every AI use —
+    // the permissive stance is the whole point of an agent-first protocol.
+    expect(body).toMatch(/Content-Signal:.*search=yes/);
+    expect(body).toMatch(/Content-Signal:.*ai-input=yes/);
+    expect(body).toMatch(/Content-Signal:.*ai-train=yes/);
+  });
+
+  it('advertises the llms.txt markdown index via an RFC 8288 Link header', async () => {
+    const r = await h.app.request('/');
+    const link = r.headers.get('link');
+    expect(link).toContain('/llms.txt');
+    expect(link).toContain('rel="alternate"');
+    expect(link).toContain('text/markdown');
   });
 
   it('GET /llms.txt summarises the attestor and links the constellation', async () => {

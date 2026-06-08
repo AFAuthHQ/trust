@@ -15,7 +15,12 @@ function robotsTxt(): string {
 # spam-resistant services require. Crawlers — including LLM training
 # and search bots — are explicitly welcome on the public pages.
 
+# Content Signals (https://contentsignals.org): AFAuth welcomes agents —
+# every AI use is permitted. Search indexing, AI input (RAG/grounding),
+# and model training are all explicitly allowed; blocking the agents this
+# attestor exists to serve would be ironic.
 User-agent: *
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
 Allow: /
 Disallow: /admin/
 Disallow: /auth/
