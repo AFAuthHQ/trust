@@ -268,7 +268,19 @@ export function layout(opts: LayoutOpts): HtmlEscapedString | Promise<HtmlEscape
 <meta property="og:title" content="${opts.title}">
 <meta property="og:description" content="${description}">
 <meta property="og:url" content="${canonical}">
+<meta property="og:image" content="https://afauth.org/og-trust.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="AFAuth Trust — link an agent to a human, then mint short-lived, PII-free attestations.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${opts.title}">
+<meta name="twitter:description" content="${description}">
+<meta name="twitter:image" content="https://afauth.org/og-trust.png">
+<meta name="twitter:image:alt" content="AFAuth Trust — link an agent to a human, then mint short-lived, PII-free attestations.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="alternate" type="text/markdown" title="LLM-friendly site summary" href="/llms.txt">
+<link rel="sitemap" type="application/xml" href="/sitemap.xml">
 <style>${raw(STYLE)}</style>
 </head>
 <body>

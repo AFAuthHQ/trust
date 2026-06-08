@@ -21,6 +21,7 @@ import { healthRoutes } from './routes/health.js';
 import { createLinkRoutes } from './routes/link.js';
 import { createOauthGoogleRoutes } from './routes/oauth-google.js';
 import { createPageRoutes } from './routes/pages.js';
+import { createSeoRoutes } from './routes/seo.js';
 import { createTokenRoutes } from './routes/token.js';
 import { createWellKnownRoutes } from './routes/wellknown.js';
 
@@ -167,6 +168,7 @@ export function createApp(deps: AppDeps): Hono {
 
   app.route('/', healthRoutes);
   app.route('/', createWellKnownRoutes(deps));
+  app.route('/', createSeoRoutes());
   app.route('/v1/link', createLinkRoutes(deps));
   app.route('/v1/token', createTokenRoutes(deps));
   app.route('/v1/bindings', createBindingRoutes(deps));
