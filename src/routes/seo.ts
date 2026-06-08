@@ -137,7 +137,10 @@ export function createSeoRoutes(): Hono {
 
   r.get('/robots.txt', (c) => {
     c.header('content-type', 'text/plain; charset=utf-8');
-    c.header('cache-control', 'public, max-age=3600');
+    // Short cache: robots.txt carries discovery directives (Content-Signal,
+    // sitemap pointer) that gate agent-readiness. A long CDN/proxy cache
+    // makes edits propagate slowly — keep it brief so changes go live fast.
+    c.header('cache-control', 'public, max-age=300');
     return c.body(robotsTxt());
   });
 
