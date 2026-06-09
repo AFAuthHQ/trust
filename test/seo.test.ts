@@ -37,6 +37,26 @@ describe('SEO / discovery routes (robots, llms, sitemap, security.txt)', () => {
     expect(link).toContain('text/markdown');
   });
 
+  it('GET / serves Markdown when the client asks for text/markdown', async () => {
+    const r = await h.app.request('/', { headers: { accept: 'text/markdown' } });
+    expect(r.status).toBe(200);
+    expect(r.headers.get('content-type')).toContain('text/markdown');
+    // Vary: Accept so a shared cache keys the two representations apart.
+    expect(r.headers.get('vary')).toMatch(/accept/i);
+    const body = await r.text();
+    expect(body).toContain('# trust.afauth.org');
+    expect(body).toContain('PII-free');
+    // Must be the markdown view, not the HTML landing page.
+    expect(body).not.toContain('og:image');
+  });
+
+  it('GET / falls through to HTML for browsers (no Accept: text/markdown)', async () => {
+    const r = await h.app.request('/');
+    expect(r.status).toBe(200);
+    expect(r.headers.get('content-type')).toContain('text/html');
+    expect(await r.text()).toContain('og:image');
+  });
+
   it('GET /llms.txt summarises the attestor and links the constellation', async () => {
     const r = await h.app.request('/llms.txt');
     expect(r.status).toBe(200);
