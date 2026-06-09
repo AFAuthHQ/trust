@@ -9,6 +9,7 @@ import { getLogger } from '../lib/logger.js';
 import { confirmLinkRequest } from '../lib/link-confirm.js';
 import { layout } from '../views/layout.js';
 import { landingPage } from '../views/landing.js';
+import { developersPage } from '../views/developers.js';
 import { accountPage } from '../views/account.js';
 import {
   linkConfirmPage,
@@ -46,6 +47,16 @@ export function createPageRoutes(deps: { store: Store; redis: Redis }): Hono {
         title: 'Take-down policy · trust.afauth.org',
         path: '/policy',
         body: policyPage(),
+      }),
+    ),
+  );
+
+  app.get('/developers', async (c) =>
+    c.html(
+      await layout({
+        title: 'For service developers · trust.afauth.org',
+        path: '/developers',
+        body: developersPage(),
       }),
     ),
   );
