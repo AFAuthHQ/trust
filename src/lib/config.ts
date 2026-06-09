@@ -152,6 +152,16 @@ const ConfigSchema = z.object({
    */
   GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
+
+  /**
+   * OIDC relying parties for "Sign in with AFAuth". A JSON array of
+   * `{ client_id, service_did, redirect_uris }`. `service_did` MUST equal the
+   * RP's AFAuth service DID (the attestation `aud`), so the id_token's `sub_h`
+   * converges with what the RP stored at attested signup (decision §3). Empty
+   * → no registered clients (every /oidc/authorize returns invalid_client).
+   * Parsed + validated at boot by `parseOidcClients` / `assertOidcClients`.
+   */
+  TRUST_OIDC_CLIENTS: z.string().default(''),
 }).superRefine((cfg, ctx) => {
   // Hard guard: refuse to boot in production with the e2e escape
   // hatch enabled. A "MUST NOT in production" comment is not an

@@ -13,6 +13,7 @@ import { createApp } from '../src/server.js';
 import { MemoryStore } from '../src/lib/store/memory.js';
 import { PgEncryptedKeyVault, type KeyVault } from '../src/lib/keyvault.js';
 import type { GoogleOauthDeps } from '../src/lib/oauth/google.js';
+import type { OidcClientRegistry } from '../src/lib/oidc-clients.js';
 import type { Store } from '../src/lib/store/index.js';
 
 /**
@@ -47,7 +48,11 @@ export interface TestHarness {
 }
 
 export async function createTestHarness(
-  opts: { googleOauthDeps?: GoogleOauthDeps; perBindingDailyTokenLimit?: number } = {},
+  opts: {
+    googleOauthDeps?: GoogleOauthDeps;
+    perBindingDailyTokenLimit?: number;
+    oidcClients?: OidcClientRegistry;
+  } = {},
 ): Promise<TestHarness> {
   setTestEnv();
   const store = new MemoryStore();
@@ -61,6 +66,7 @@ export async function createTestHarness(
     vault,
     perBindingDailyTokenLimit: opts.perBindingDailyTokenLimit,
     googleOauthDeps: opts.googleOauthDeps,
+    oidcClients: opts.oidcClients,
   });
   return { app, store, redis, vault };
 }

@@ -87,6 +87,56 @@ export async function mintAttestationJwt(
 }
 
 // ---------------------------------------------------------------------
+// OIDC id_token ("Sign in with AFAuth")
+// ---------------------------------------------------------------------
+//
+// The human-facing twin of the §10 attestation, signed by the SAME EdDSA
+// key (so consuming services verify it against the same JWKS). Its `sub`
+// IS the pairwise `sub_h`; `iss` is the OIDC issuer URL (PUBLIC_BASE_URL);
+// `aud` is the relying party's service DID (== its OIDC client_id). It
+// carries no agent DID / verification claim — a human authenticated to
+// trust, not an agent vouched-for by it.
+
+export const ID_TOKEN_TTL_SECONDS = 300;
+export const ID_TOKEN_MAX_TTL_SECONDS = 600;
+
+export interface MintIdTokenOpts {
+  vault: KeyVault;
+  /** OIDC issuer — the trust base URL (PUBLIC_BASE_URL). */
+  issuer: string;
+  /** Subject — the pairwise `sub_h` (deriveSubH(humanId, aud)). */
+  subH: string;
+  /** Audience — the relying party's service DID (== its OIDC client_id). */
+  audience: string;
+  /** Optional OIDC `nonce` echoed back from /authorize. */
+  nonce?: string;
+  /** Defaults to ID_TOKEN_TTL_SECONDS; capped at ID_TOKEN_MAX_TTL_SECONDS. */
+  ttlSeconds?: number;
+}
+
+export async function mintIdToken(
+  opts: MintIdTokenOpts,
+): Promise<{ jwt: string; kid: string; iat: number; exp: number }> {
+  const ttl = Math.min(
+    opts.ttlSeconds ?? ID_TOKEN_TTL_SECONDS,
+    ID_TOKEN_MAX_TTL_SECONDS,
+  );
+  const active = await opts.vault.getActive();
+  const signingKey = await opts.vault.getSigningKey(active.kid);
+  const iat = Math.floor(Date.now() / 1000);
+  const exp = iat + ttl;
+  const jwt = await new SignJWT({ ...(opts.nonce ? { nonce: opts.nonce } : {}) })
+    .setProtectedHeader({ alg: ATTESTATION_JWT_ALG, typ: 'JWT', kid: active.kid })
+    .setIssuer(opts.issuer)
+    .setSubject(opts.subH)
+    .setAudience(opts.audience)
+    .setIssuedAt(iat)
+    .setExpirationTime(exp)
+    .sign(signingKey);
+  return { jwt, kid: active.kid, iat, exp };
+}
+
+// ---------------------------------------------------------------------
 // /link request envelope (HS256, server-internal)
 // ---------------------------------------------------------------------
 

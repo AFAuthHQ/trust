@@ -24,6 +24,12 @@ import { createPageRoutes } from './routes/pages.js';
 import { createSeoRoutes } from './routes/seo.js';
 import { createTokenRoutes } from './routes/token.js';
 import { createWellKnownRoutes } from './routes/wellknown.js';
+import { createOidcRoutes } from './routes/oidc.js';
+import {
+  assertOidcClients,
+  parseOidcClients,
+  type OidcClientRegistry,
+} from './lib/oidc-clients.js';
 
 export interface AppDeps {
   store: Store;
@@ -33,10 +39,19 @@ export interface AppDeps {
   perBindingDailyTokenLimit?: number;
   /** Test-only: inject a fake fetcher / JWKS for the Google OAuth client. */
   googleOauthDeps?: GoogleOauthDeps;
+  /** OIDC relying parties for "Sign in with AFAuth". Defaults to parsing
+   *  `TRUST_OIDC_CLIENTS` from config. */
+  oidcClients?: OidcClientRegistry;
 }
 
 export function createApp(deps: AppDeps): Hono {
   const app = new Hono();
+
+  // "Sign in with AFAuth" relying parties. Fail closed at boot on a malformed
+  // service_did / redirect_uri (decision §3) rather than mint non-converging
+  // sub_h values later.
+  const oidcClients = deps.oidcClients ?? parseOidcClients(getConfig().TRUST_OIDC_CLIENTS);
+  assertOidcClients(oidcClients);
 
   app.use('*', async (c, next) => {
     const start = Date.now();
@@ -173,6 +188,10 @@ export function createApp(deps: AppDeps): Hono {
 
   app.route('/', healthRoutes);
   app.route('/', createWellKnownRoutes(deps));
+  app.route(
+    '/',
+    createOidcRoutes({ store: deps.store, redis: deps.redis, vault: deps.vault, oidcClients }),
+  );
   app.route('/', createSeoRoutes());
   app.route('/v1/link', createLinkRoutes(deps));
   app.route('/v1/token', createTokenRoutes(deps));
