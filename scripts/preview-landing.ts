@@ -4,11 +4,11 @@
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
-import { landingPage } from '../src/views/landing.ts';
-import { developersPage } from '../src/views/developers.ts';
-import { operatorPage } from '../src/views/operator.ts';
-import { policyPage } from '../src/views/policy.ts';
-import { layout } from '../src/views/layout.ts';
+import { landingPage } from '../src/views/landing.js';
+import { developersPage } from '../src/views/developers.js';
+import { operatorPage } from '../src/views/operator.js';
+import { policyPage } from '../src/views/policy.js';
+import { layout } from '../src/views/layout.js';
 
 const app = new Hono();
 

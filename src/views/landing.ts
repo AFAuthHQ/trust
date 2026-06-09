@@ -3,19 +3,34 @@ import { html } from 'hono/html';
 export function landingPage() {
   return html`
     <style>
-      /* ===== sequence diagram: Agent · Trust · Service ===== */
+      /* prominent hero call-to-action */
+      .hero-cta { margin: 28px 0 4px; }
+      .btn-cta {
+        font-size: 17px; font-weight: 700; padding: 14px 30px; border-radius: 9px;
+        box-shadow: 0 10px 24px rgba(184, 50, 39, 0.20);
+        transition: transform 0.12s ease, box-shadow 0.12s ease;
+      }
+      .btn-cta:hover { transform: translateY(-1px); box-shadow: 0 12px 30px rgba(184, 50, 39, 0.28); }
+      .hero-cta-note { display: block; margin-top: 12px; font-size: 13px; color: var(--muted); }
+      .hero-cta-note b { color: var(--fg); font-weight: 600; }
+
+      /* how-it-works framing */
+      .seq-eyebrow {
+        text-align: center; margin: 36px 0 0;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 11px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted);
+      }
+
+      /* ===== sequence diagram: Agent · Trust · Service (blended into page) ===== */
       .seq-band {
         position: relative; left: 50%; transform: translateX(-50%);
-        width: min(840px, calc(100vw - 32px)); margin: 28px 0 12px;
+        width: min(800px, calc(100vw - 32px)); margin: 10px 0 12px;
       }
       .seq-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
       .seq {
         --c-agent: #5b54c9; --c-trust: #b83227; --c-service: #2f8f86;
         --c-once: #c2730f;
-        min-width: 580px;
-        border: 1px solid var(--line); border-radius: 12px; background: var(--paper);
-        box-shadow: 0 8px 26px rgba(20, 16, 8, 0.06);
-        padding: 16px 20px 12px;
+        min-width: 560px; background: transparent; padding: 2px 6px 4px;
       }
 
       .seq-head { display: grid; grid-template-columns: repeat(3, 1fr); margin-bottom: 4px; }
@@ -34,8 +49,8 @@ export function landingPage() {
       /* phase zones — one-time (manual) vs every-signup (automatic) */
       .seq-phase { position: relative; border-radius: 10px; padding: 2px 0 6px; }
       .seq-phase + .seq-phase { margin-top: 9px; }
-      .seq-phase.once { background: rgba(194, 115, 15, 0.08); border: 1px solid rgba(194, 115, 15, 0.22); }
-      .seq-phase.auto { background: rgba(47, 143, 134, 0.07); border: 1px solid rgba(47, 143, 134, 0.20); }
+      .seq-phase.once { background: rgba(194, 115, 15, 0.09); border: 1px solid rgba(194, 115, 15, 0.20); }
+      .seq-phase.auto { background: rgba(47, 143, 134, 0.08); border: 1px solid rgba(47, 143, 134, 0.18); }
       .seq-tag {
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em;
@@ -79,34 +94,70 @@ export function landingPage() {
       .seq-row.note { height: 40px; }
       .seq-note {
         position: absolute; top: 4px; transform: translateX(-50%);
-        background: var(--paper); border: 1px solid var(--line); border-radius: 6px;
-        padding: 6px 11px; max-width: 320px; text-align: center;
+        background: rgba(255, 255, 255, 0.6); border: 1px solid rgba(20, 16, 8, 0.09);
+        border-radius: 6px; padding: 6px 11px; max-width: 320px; text-align: center;
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         font-size: 11px; color: var(--muted); line-height: 1.35;
       }
       .seq-note .hu { color: var(--c-once); font-weight: 700; }
       .seq-note .ok { color: #2c6044; font-weight: 700; }
 
-      .seq-caption { font-size: 14px; color: var(--fg); max-width: 66ch; margin: 14px 0 0; }
+      .seq-caption { font-size: 14px; color: var(--fg); max-width: 66ch; margin: 12px auto 0; text-align: center; }
       .seq-caption b { color: var(--accent); }
       .seq-caption .muted { color: var(--muted); }
+
+      /* value: two columns */
+      .value-grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 30px;
+        margin-top: 44px; padding-top: 30px; border-top: 1px solid var(--line);
+      }
+      .value-grid h2 { margin: 0 0 12px; font-size: 18px; }
+      .value-grid ul { list-style: none; padding: 0; margin: 0; }
+      .value-grid li { display: flex; gap: 11px; margin: 9px 0; font-size: 15px; line-height: 1.4; }
+      .value-grid .ic { font-weight: 700; flex: 0 0 1em; }
+      .value-grid .ic.ok { color: #2c6044; }
+      .value-grid .ic.no { color: var(--accent); }
+
+      .verif { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 26px; }
+      .verif-label {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em;
+        color: var(--muted); margin-right: 4px;
+      }
+
+      /* closing call-to-action */
+      .close-cta {
+        margin-top: 48px; padding: 28px; text-align: center;
+        border-radius: 14px; background: rgba(184, 50, 39, 0.05);
+        border: 1px solid rgba(184, 50, 39, 0.13);
+      }
+      .close-cta p { margin: 0 0 16px; font-size: 19px; color: var(--fg); }
 
       @media (prefers-reduced-motion: no-preference) {
         .seq-phase { opacity: 0; animation: seq-in 0.5s ease forwards; }
         .seq-phase.auto { animation-delay: 0.18s; }
         @keyframes seq-in { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
       }
+      @media (max-width: 600px) {
+        .value-grid { grid-template-columns: 1fr; gap: 22px; }
+      }
     </style>
 
-    <h1 style="font-size: 38px; line-height: 1.12; margin: 0 0 16px;">
+    <h1 style="font-size: 40px; line-height: 1.1; margin: 0 0 16px;">
       A real human behind every agent.
     </h1>
-    <p class="lede" style="font-size: 19px; max-width: 60ch;">
+    <p class="lede" style="font-size: 19px; max-width: 58ch;">
       Link your agent to you once. It can then prove a real person is behind it —
       so services grant real-user access (full free tier, no CAPTCHA) without ever
       seeing your email.
     </p>
 
+    <div class="hero-cta">
+      <a href="/signin" class="btn btn-primary btn-cta">Sign in to manage agents →</a>
+      <span class="hero-cta-note">Free · sign in with email — <b>no service ever sees it</b></span>
+    </div>
+
+    <p class="seq-eyebrow">How it works</p>
     <div class="seq-band">
       <div class="seq-scroll">
         <div class="seq" role="img"
@@ -191,54 +242,40 @@ export function landingPage() {
     </div>
     <p class="seq-caption">
       <b>Why the service can skip the CAPTCHA.</b> In step ③ it gets a short proof
-      it can check on its own — and that proof means a real person approved this
-      agent back in step ①. <span class="muted">So it opens the full free tier with
-      no email, no profile, and no bot-defense gauntlet.</span>
+      it can check on its own — proof that a real person approved this agent back in
+      step ①. <span class="muted">So it opens the full free tier: no email, no
+      profile, no bot-defense gauntlet.</span>
     </p>
 
-    <p style="margin-top: 26px;">
-      <a href="/signin" class="btn btn-primary" style="font-size: 16px; padding: 12px 22px;">
-        Sign in to manage agents
-      </a>
-    </p>
+    <div class="value-grid">
+      <div class="value-col">
+        <h2>What you control</h2>
+        <ul>
+          <li><span class="ic ok" aria-hidden="true">✓</span><span>Sign in once with email.</span></li>
+          <li><span class="ic ok" aria-hidden="true">✓</span><span>See every linked agent in one place.</span></li>
+          <li><span class="ic ok" aria-hidden="true">✓</span><span>Revoke any agent instantly — tokens expire within 15 minutes.</span></li>
+        </ul>
+      </div>
+      <div class="value-col">
+        <h2>What's not shared</h2>
+        <ul>
+          <li><span class="ic no" aria-hidden="true">✗</span><span>Services never see your email.</span></li>
+          <li><span class="ic no" aria-hidden="true">✗</span><span>Services never see what other services you use.</span></li>
+          <li><span class="ic no" aria-hidden="true">✗</span><span>Tokens carry &ldquo;verified human&rdquo; — nothing else.</span></li>
+        </ul>
+      </div>
+    </div>
 
-    <h2 style="margin-top: 36px;">What you control</h2>
-    <ul style="list-style: none; padding: 0; margin: 0;">
-      <li style="display: flex; gap: 12px; margin: 10px 0;">
-        <span aria-hidden="true" style="color: #2c6044; font-weight: 700; flex: 0 0 1em;">✓</span>
-        <span>Sign in once with email.</span>
-      </li>
-      <li style="display: flex; gap: 12px; margin: 10px 0;">
-        <span aria-hidden="true" style="color: #2c6044; font-weight: 700; flex: 0 0 1em;">✓</span>
-        <span>See every linked agent in one place.</span>
-      </li>
-      <li style="display: flex; gap: 12px; margin: 10px 0;">
-        <span aria-hidden="true" style="color: #2c6044; font-weight: 700; flex: 0 0 1em;">✓</span>
-        <span>Revoke any agent instantly — tokens expire within 15 minutes.</span>
-      </li>
-    </ul>
-
-    <h2 style="margin-top: 28px;">What's not shared</h2>
-    <ul style="list-style: none; padding: 0; margin: 0;">
-      <li style="display: flex; gap: 12px; margin: 10px 0;">
-        <span aria-hidden="true" style="color: var(--accent); font-weight: 700; flex: 0 0 1em;">✗</span>
-        <span>Services never see your email.</span>
-      </li>
-      <li style="display: flex; gap: 12px; margin: 10px 0;">
-        <span aria-hidden="true" style="color: var(--accent); font-weight: 700; flex: 0 0 1em;">✗</span>
-        <span>Services never see what other services you use.</span>
-      </li>
-      <li style="display: flex; gap: 12px; margin: 10px 0;">
-        <span aria-hidden="true" style="color: var(--accent); font-weight: 700; flex: 0 0 1em;">✗</span>
-        <span>Tokens carry &ldquo;verified human&rdquo; — nothing else.</span>
-      </li>
-    </ul>
-
-    <h2 style="margin-top: 28px;">Verification methods</h2>
-    <p style="display: flex; flex-wrap: wrap; gap: 8px; margin: 0;">
+    <div class="verif">
+      <span class="verif-label">Verification methods</span>
       <span class="pill pill-ok">email · live</span>
       <span class="pill pill-ok">oauth · live</span>
       <span class="pill pill-dim">payment · scaffolded</span>
-    </p>
+    </div>
+
+    <div class="close-cta">
+      <p>Manage every agent that acts for you.</p>
+      <a href="/signin" class="btn btn-primary btn-cta">Sign in to manage agents →</a>
+    </div>
   `;
 }

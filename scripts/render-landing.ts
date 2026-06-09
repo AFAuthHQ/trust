@@ -2,8 +2,8 @@
 // without booting the server (no Postgres/Redis needed). Run with:
 //   npx tsx scripts/render-landing.ts
 import { writeFileSync } from 'node:fs';
-import { landingPage } from '../src/views/landing.ts';
-import { layout } from '../src/views/layout.ts';
+import { landingPage } from '../src/views/landing.js';
+import { layout } from '../src/views/layout.js';
 
 const out = await layout({
   title: 'trust.afauth.org',
