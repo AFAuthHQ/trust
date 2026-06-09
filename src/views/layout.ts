@@ -236,6 +236,9 @@ const STYLE = `
     color: var(--muted);
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
+  footer.site .foot-links { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 10px; }
+  footer.site .foot-links a { color: var(--fg); text-decoration: none; }
+  footer.site .foot-links a:hover { color: var(--accent); }
 `;
 
 const DEFAULT_DESCRIPTION =
@@ -295,8 +298,6 @@ export function layout(opts: LayoutOpts): HtmlEscapedString | Promise<HtmlEscape
   </a>
   <div class="links">
     <a class="hide-sm" href="/account">Account</a>
-    <a class="hide-sm" href="/operator">Operator</a>
-    <a class="hide-sm" href="/policy">Policy</a>
     <a href="https://afauth.org" rel="noopener">afauth.org</a>
     <a class="ext" href="https://github.com/AFAuthHQ" target="_blank" rel="noopener" aria-label="AFAuth on GitHub">
       <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
@@ -308,6 +309,11 @@ export function layout(opts: LayoutOpts): HtmlEscapedString | Promise<HtmlEscape
 </nav></header>
 <main>${opts.body}</main>
 <footer class="site">
+  <div class="foot-links">
+    <a href="/developers">Developers</a>
+    <a href="/operator">Operator</a>
+    <a href="/policy">Policy</a>
+  </div>
   Operated by afauth.org per
   <a href="https://github.com/AFAuthHQ/spec/blob/main/proposals/0006-afauth-trust-attestor.md" target="_blank" rel="noopener">AFAP-0006</a>.
   No PII in attestation claims.
