@@ -120,6 +120,16 @@ export function createTokenRoutes(deps: {
       }
       if (human.paused_at) throw TrustError.accountPaused();
 
+      // §10.3.1 per-service suspension: the owner has revoked minting for this
+      // (agent DID, service) pair from /account. Checked before the quota incr
+      // below — like the pause check — so a suspended pair consumes no
+      // rate-limit allowance. The first mint for a pair finds no row and
+      // proceeds; the row is written after a successful mint, so a brand-new
+      // pair is never spuriously suspended.
+      if (await store.isServiceSignupRevoked(binding.agent_did, body.data.aud)) {
+        throw TrustError.serviceSuspended();
+      }
+
       // Per-binding daily quota.
       const dayKey = `token:binding:${binding.id}:${new Date().toISOString().slice(0, 10)}`;
       const dayCount = await incrFixedWindow(redis, dayKey, 86400);
@@ -179,6 +189,13 @@ export function createTokenRoutes(deps: {
           expires_at: new Date(exp * 1000),
         }),
         store.recordBindingUse(binding.id, new Date(iat * 1000), bindingExpires),
+        // §10.3.1 connected-services ledger: record (or bump) this
+        // (agent DID, service) pair so the owner can see and revoke it.
+        store.recordServiceSignup({
+          human_id: binding.human_id,
+          agent_did: binding.agent_did,
+          service_did: body.data.aud,
+        }),
       ]);
 
       const resp: TokenResponse = {

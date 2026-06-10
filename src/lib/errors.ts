@@ -11,6 +11,7 @@ export type ErrorCode =
   | 'invalid_attestation'
   | 'binding_revoked'
   | 'account_paused'
+  | 'service_suspended'
   | 'binding_expired'
   | 'binding_not_ready'
   | 'agent_already_bound'
@@ -103,6 +104,20 @@ export class TrustError extends Error {
     message = 'The owner has paused all agents on this account; they can resume it at trust.afauth.org/account',
   ) {
     return new TrustError('account_paused', message, 403);
+  }
+  /**
+   * §10.3.1 per-service suspension — the owner has revoked minting for a
+   * single (agent DID, service) pair at /account, while leaving the binding
+   * and every other service intact. 403, the same authenticated-but-forbidden
+   * family as `binding_revoked` / `account_paused`, so a consuming service
+   * treats it as a revocation rather than a re-auth prompt. Stops only NEW
+   * issuance for this pair; tokens already minted stay valid to their `exp`.
+   * The agent MUST NOT retry for this `aud` until the owner restores it.
+   */
+  static serviceSuspended(
+    message = 'The owner has revoked this service for this agent; they can restore it at trust.afauth.org/account',
+  ) {
+    return new TrustError('service_suspended', message, 403);
   }
   static bindingExpired(message = 'Binding token has expired; re-link the agent') {
     return new TrustError('binding_expired', message, 410);
