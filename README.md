@@ -117,8 +117,8 @@ curl -s localhost:3001/.well-known/jwks.json
 | GET    | `/account`                       | Dashboard: linked agents, verification methods |
 | POST   | `/v1/link/start`                 | Agent → returns deep-link URL + poll URL |
 | POST   | `/v1/link/confirm`               | Browser (session cookie) → marks link request confirmed |
-| POST   | `/v1/link/poll`                  | Agent (signs body) → returns binding token when confirmed |
-| POST   | `/v1/token`                      | Agent (bearer binding token) → returns §10 attestation JWT |
+| POST   | `/v1/link/poll`                  | Agent (signs body) → returns the binding (id + expiry) when confirmed |
+| POST   | `/v1/token`                      | Agent (signs request, RFC 9421 — keyless) → returns §10 attestation JWT |
 | DELETE | `/v1/bindings/:id`               | Human (session cookie) → revokes a binding |
 
 When Google OAuth is configured (see [Configuration](#configuration)),
