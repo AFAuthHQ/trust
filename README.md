@@ -20,6 +20,7 @@ This repository is the canonical attestor at **[`trust.afauth.org`](https://trus
 - [Stack](#stack)
 - [Local development](#local-development)
 - [Endpoints](#endpoints)
+- [Sign in with AFAuth (OIDC IdP)](#sign-in-with-afauth-oidc-idp)
 - [Configuration](#configuration)
 - [Key management](#key-management)
 - [Rate limits](#rate-limits)
@@ -130,6 +131,67 @@ when it isn't:
 | GET    | `/auth/google/callback` | OAuth redirect target |
 | POST   | `/auth/google/revoke`   | Disconnect Google from an account |
 
+When OIDC clients are registered (`TRUST_OIDC_CLIENTS`), the attestor also acts
+as an **OpenID Provider** for [Sign in with AFAuth](#sign-in-with-afauth-oidc-idp):
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET  | `/.well-known/openid-configuration` | OIDC discovery document (cached 300s) |
+| GET  | `/oidc/authorize`                   | Human sign-in — Authorization Code + PKCE (`S256`) |
+| POST | `/oidc/token`                       | Exchange the auth code for an `id_token` |
+
+## Sign in with AFAuth (OIDC IdP)
+
+Beyond agent attestation, the trust attestor doubles as an **OpenID Provider** so
+a consuming service can offer human **Sign in with AFAuth**: a human signs in and
+lands in the *same account their agent created*. An AFAuth account is keyed on the
+pairwise principal `(iss, sub_h)` — which is exactly an OIDC `(issuer, subject)` —
+so the `id_token`'s `sub` is the very `sub_h` this attestor mints in an attestation
+for that `(human, service)`. Normative shape: [`spec/core.md` §10.8](https://github.com/AFAuthHQ/spec/blob/main/spec/core.md#108-human-sign-in-via-the-trust-attestor-openid-provider)
+(AFAP-0008). Service-side how-to: [Add Sign in with AFAuth](https://docs.afauth.org/guides/add-sign-in-with-afauth).
+
+Standard Authorization Code + PKCE (`S256`); the OIDC keys are the same JWKS used
+for attestation. The `id_token`:
+
+```
+header: { alg: "EdDSA", typ: "JWT", kid: "<from jwks.json>" }
+claims: {
+  iss:   "https://trust.afauth.org",   // a URL — NOT the bare "afauth-trust" of an attestation
+  aud:   "<service_did>",
+  sub:   "<sub_h — identical to the attestation's sub_h for this (human, service)>",
+  iat:   <unix>,
+  exp:   <unix>,
+  nonce: "<echoed if supplied>"
+}
+```
+
+**Issuer note.** An attestation's `iss` is the bare string `afauth-trust`; the
+`id_token`'s `iss` is the URL `https://trust.afauth.org`. They denote the same
+attestor, so a relying party that keys accounts on `(iss, sub_h)` MUST canonicalize
+both to one issuer before lookup (§10.8.4) — otherwise the human lands in a new,
+empty account. No PII is ever placed in the `id_token`.
+
+### Registering a client
+
+Set `TRUST_OIDC_CLIENTS` to a JSON array of the services allowed to use sign-in:
+
+```json
+[
+  {
+    "client_id":     "did:web:api.example.com",
+    "service_did":   "did:web:api.example.com",
+    "redirect_uris": ["https://api.example.com/auth/afauth/callback"]
+  }
+]
+```
+
+- `service_did` **MUST equal** the value the service uses as the attestation `aud`
+  — it is the audience input to the `sub_h` derivation, so a mismatch lands the
+  human in a different (empty) account.
+- `redirect_uris` is an exact allowlist; an authorization request with any other
+  redirect is rejected before a code is issued.
+- Validation is fail-closed at boot: a malformed entry stops startup.
+
 ## Configuration
 
 The full template is in [`.env.example`](.env.example). On Railway,
@@ -151,6 +213,7 @@ template committed to the repo.**
 | `EMAIL_FROM`                 | ✅ | Magic-link sender address. |
 | `EMAIL_API_KEY`              | if provider ≠ `stdout` | Email provider API key. |
 | `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | optional | Enables "Continue with Google". Both required together; the button hides when either is unset. |
+| `TRUST_OIDC_CLIENTS`         | optional | JSON array registering OIDC relying parties for [Sign in with AFAuth](#sign-in-with-afauth-oidc-idp): `[{client_id, service_did, redirect_uris[]}]`. Unset → the OIDC endpoints accept no clients. `service_did` must match the client's attestation `aud`. Validated fail-closed at boot. |
 | `NODE_ENV`                   | optional | `production` in production. |
 | `LOG_LEVEL`                  | optional | `info` default. |
 | `PORT`                       | optional | Defaults to 3001. |
