@@ -14,6 +14,7 @@ import type {
   InsertSigningKeyInput,
   LinkRequestRecord,
   MagicLinkRecord,
+  ServiceSignupRecord,
   SessionRecord,
   SigningKeyRecord,
   Store,
@@ -396,6 +397,55 @@ export class PgStore implements Store {
   }
 
   // -------------------------------------------------------------------
+  // Service signups (connected-services ledger, §10.3.1 / §8.5)
+  // -------------------------------------------------------------------
+
+  async recordServiceSignup(input: {
+    human_id: string;
+    agent_did: string;
+    service_did: string;
+  }): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO service_signups (human_id, agent_did, service_did)
+         VALUES ($1, $2, $3)
+       ON CONFLICT (agent_did, service_did) DO UPDATE
+         SET last_seen = now(), human_id = EXCLUDED.human_id`,
+      [input.human_id, input.agent_did, input.service_did],
+    );
+  }
+
+  async isServiceSignupRevoked(agent_did: string, service_did: string): Promise<boolean> {
+    const { rows } = await this.pool.query(
+      `SELECT 1 FROM service_signups
+       WHERE agent_did = $1 AND service_did = $2 AND revoked_at IS NOT NULL`,
+      [agent_did, service_did],
+    );
+    return rows.length > 0;
+  }
+
+  async listServiceSignupsByHuman(human_id: string): Promise<ServiceSignupRecord[]> {
+    const { rows } = await this.pool.query(
+      'SELECT * FROM service_signups WHERE human_id = $1 ORDER BY first_seen DESC',
+      [human_id],
+    );
+    return rows.map(toServiceSignup);
+  }
+
+  async setServiceSignupRevoked(
+    id: string,
+    human_id: string,
+    revoked: boolean,
+  ): Promise<ServiceSignupRecord | null> {
+    const { rows } = await this.pool.query(
+      `UPDATE service_signups SET revoked_at = $3
+       WHERE id = $1 AND human_id = $2
+       RETURNING *`,
+      [id, human_id, revoked ? new Date() : null],
+    );
+    return rows[0] ? toServiceSignup(rows[0]) : null;
+  }
+
+  // -------------------------------------------------------------------
   // Signing keys
   // -------------------------------------------------------------------
 
@@ -546,6 +596,18 @@ function toBinding(r: any): BindingRecord {
     expires_at: r.expires_at,
     revoked_at: r.revoked_at,
     last_used_at: r.last_used_at,
+  };
+}
+
+function toServiceSignup(r: any): ServiceSignupRecord {
+  return {
+    id: String(r.id),
+    human_id: r.human_id,
+    agent_did: r.agent_did,
+    service_did: r.service_did,
+    first_seen: r.first_seen,
+    last_seen: r.last_seen,
+    revoked_at: r.revoked_at,
   };
 }
 

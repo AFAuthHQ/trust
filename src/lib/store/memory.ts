@@ -10,6 +10,7 @@ import type {
   InsertSigningKeyInput,
   LinkRequestRecord,
   MagicLinkRecord,
+  ServiceSignupRecord,
   SessionRecord,
   SigningKeyRecord,
   Store,
@@ -32,6 +33,8 @@ export class MemoryStore implements Store {
   private bindings = new Map<string, BindingRecord>();
   private signingKeys = new Map<string, SigningKeyRecord>();
   private tokenLog: Array<TokenLogEntry & { issued_at: Date }> = [];
+  private serviceSignups: ServiceSignupRecord[] = [];
+  private serviceSignupCounter = 0;
 
   // Strictly monotonic createdAt for signing keys. Date.now() has
   // 1ms resolution; two inserts in the same ms otherwise tie, which
@@ -318,6 +321,48 @@ export class MemoryStore implements Store {
       b.last_used_at = usedAt;
       b.expires_at = expiresAt;
     }
+  }
+
+  // Service signups (connected-services ledger, §10.3.1 / §8.5)
+  async recordServiceSignup(input: {
+    human_id: string;
+    agent_did: string;
+    service_did: string;
+  }) {
+    const existing = this.serviceSignups.find(
+      (s) => s.agent_did === input.agent_did && s.service_did === input.service_did,
+    );
+    if (existing) {
+      existing.last_seen = new Date();
+      existing.human_id = input.human_id;
+      return;
+    }
+    this.serviceSignups.push({
+      id: String(++this.serviceSignupCounter),
+      human_id: input.human_id,
+      agent_did: input.agent_did,
+      service_did: input.service_did,
+      first_seen: new Date(),
+      last_seen: new Date(),
+      revoked_at: null,
+    });
+  }
+  async isServiceSignupRevoked(agent_did: string, service_did: string) {
+    const s = this.serviceSignups.find(
+      (s) => s.agent_did === agent_did && s.service_did === service_did,
+    );
+    return !!s && s.revoked_at !== null;
+  }
+  async listServiceSignupsByHuman(human_id: string) {
+    return this.serviceSignups
+      .filter((s) => s.human_id === human_id)
+      .sort((a, b) => b.first_seen.getTime() - a.first_seen.getTime());
+  }
+  async setServiceSignupRevoked(id: string, human_id: string, revoked: boolean) {
+    const s = this.serviceSignups.find((s) => s.id === id && s.human_id === human_id);
+    if (!s) return null;
+    s.revoked_at = revoked ? new Date() : null;
+    return s;
   }
 
   // Signing keys

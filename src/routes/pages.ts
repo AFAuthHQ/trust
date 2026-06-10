@@ -194,9 +194,10 @@ export function createPageRoutes(deps: { store: Store; redis: Redis }): Hono {
     const human = await currentHuman(c, store);
     if (!human) return c.redirect('/signin?next=%2Faccount');
 
-    const [verifications, bindings, recentTokens] = await Promise.all([
+    const [verifications, bindings, serviceSignups, recentTokens] = await Promise.all([
       store.listVerifications(human.id),
       store.listBindingsByHuman(human.id),
+      store.listServiceSignupsByHuman(human.id),
       store.recentTokensByHuman(human.id, 20),
     ]);
 
@@ -208,6 +209,7 @@ export function createPageRoutes(deps: { store: Store; redis: Redis }): Hono {
           human,
           verifications,
           bindings,
+          serviceSignups,
           recentTokens,
           googleEnabled: !!getGoogleOauthConfig(),
         }),
@@ -222,6 +224,25 @@ export function createPageRoutes(deps: { store: Store; redis: Redis }): Hono {
     if (!human) return c.redirect('/signin?next=%2Faccount');
     const id = c.req.param('id');
     await store.revokeBinding(id, human.id);
+    return c.redirect('/account');
+  });
+
+  // ------ POST /account/signups/:id/{revoke,restore} ----------------
+  // §10.3.1 per-service suspension. Reversible and scoped to a single
+  // service, so — unlike resume (§8.4) — it carries no freshness floor; a
+  // valid session suffices. setServiceSignupRevoked is scoped to human.id,
+  // so an owner can only ever toggle their own rows.
+  app.post('/account/signups/:id/revoke', async (c) => {
+    const human = await currentHuman(c, store);
+    if (!human) return c.redirect('/signin?next=%2Faccount');
+    await store.setServiceSignupRevoked(c.req.param('id'), human.id, true);
+    return c.redirect('/account');
+  });
+
+  app.post('/account/signups/:id/restore', async (c) => {
+    const human = await currentHuman(c, store);
+    if (!human) return c.redirect('/signin?next=%2Faccount');
+    await store.setServiceSignupRevoked(c.req.param('id'), human.id, false);
     return c.redirect('/account');
   });
 

@@ -67,6 +67,17 @@ export interface BindingRecord {
   last_used_at: Date | null;
 }
 
+export interface ServiceSignupRecord {
+  id: string;
+  human_id: string;
+  agent_did: string;
+  service_did: string;
+  first_seen: Date;
+  last_seen: Date;
+  /** Non-null once the owner has revoked minting for this (agent DID, service) pair. */
+  revoked_at: Date | null;
+}
+
 export interface SigningKeyRecord {
   kid: string;
   alg: string;
@@ -229,6 +240,37 @@ export interface Store {
    * write. Called on every successful /v1/token mint.
    */
   recordBindingUse(id: string, usedAt: Date, expiresAt: Date): Promise<void>;
+
+  // Service signups (connected-services ledger, §10.3.1 / §8.5)
+  /**
+   * Upsert the (agent DID, service) pair on a successful mint: insert with
+   * first_seen on the first mint, bump last_seen on later ones. Owner-scoped
+   * via human_id (the binding's human). Never revokes; only records.
+   */
+  recordServiceSignup(input: {
+    human_id: string;
+    agent_did: string;
+    service_did: string;
+  }): Promise<void>;
+  /**
+   * True when the owner has revoked minting for this (agent DID, service) pair
+   * (§10.3.1). Consulted on the mint path before issuing; a missing row (a pair
+   * never seen before) is NOT revoked.
+   */
+  isServiceSignupRevoked(agent_did: string, service_did: string): Promise<boolean>;
+  /** The owner-facing connected-services list, newest signup first. */
+  listServiceSignupsByHuman(human_id: string): Promise<ServiceSignupRecord[]>;
+  /**
+   * Owner toggles minting for one pair by row id, scoped to human_id so an
+   * owner can only touch their own rows. `revoked=true` suspends, `false`
+   * restores. Returns the updated row, or null on no match (unknown id or not
+   * this human's) — mirrors revokeBinding's null-on-miss contract.
+   */
+  setServiceSignupRevoked(
+    id: string,
+    human_id: string,
+    revoked: boolean,
+  ): Promise<ServiceSignupRecord | null>;
 
   // Signing keys
   listActiveSigningKeys(): Promise<SigningKeyRecord[]>;

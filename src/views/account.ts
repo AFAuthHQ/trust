@@ -2,6 +2,7 @@ import { html } from 'hono/html';
 import type {
   BindingRecord,
   HumanRecord,
+  ServiceSignupRecord,
   VerificationRecord,
 } from '../lib/store/index.js';
 import type { VerificationMethod } from '../lib/schemas.js';
@@ -18,10 +19,12 @@ export function accountPage(opts: {
   human: HumanRecord;
   verifications: VerificationRecord[];
   bindings: BindingRecord[];
+  serviceSignups: ServiceSignupRecord[];
   recentTokens: RecentToken[];
   googleEnabled?: boolean;
 }) {
-  const { human, verifications, bindings, recentTokens, googleEnabled } = opts;
+  const { human, verifications, bindings, serviceSignups, recentTokens, googleEnabled } =
+    opts;
   const googleVerification = verifications.find(
     (v) => v.method === 'oauth' && v.provider === 'google',
   );
@@ -176,6 +179,74 @@ export function accountPage(opts: {
           `,
         )}
 
+    ${serviceSignups.length > 0
+      ? html`
+          <h2>Signups (${serviceSignups.length})</h2>
+          <p style="margin: 0 0 12px; font-size: 13px; color: var(--muted);">
+            Every service your agents have signed up to with a human-backed
+            token. Revoke one to stop vouching for you there — the agent's link
+            and your other services are untouched, and you can allow it again
+            anytime. Takes effect within 15 minutes (AFAuth's revocation bound);
+            tokens minted before then stay valid until they expire (max 15 min).
+          </p>
+          <div class="card">
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+              <thead>
+                <tr style="text-align: left; color: var(--muted);">
+                  <th style="padding: 6px 8px;">agent</th>
+                  <th style="padding: 6px 8px;">service</th>
+                  <th style="padding: 6px 8px;">first signup</th>
+                  <th style="padding: 6px 8px;"></th>
+                </tr>
+              </thead>
+              <tbody>
+                ${serviceSignups.map(
+                  (s) => html`
+                    <tr>
+                      <td
+                        style="padding: 6px 8px;"
+                        class="mono"
+                        title="${s.agent_did}"
+                      >
+                        ${shortDid(s.agent_did)}
+                      </td>
+                      <td style="padding: 6px 8px;" class="mono">${s.service_did}</td>
+                      <td style="padding: 6px 8px;">
+                        ${s.first_seen.toISOString().slice(0, 10)}
+                      </td>
+                      <td style="padding: 6px 8px; text-align: right; white-space: nowrap;">
+                        ${s.revoked_at
+                          ? html`
+                              <span class="pill pill-warn">revoked</span>
+                              <form
+                                method="post"
+                                action="/account/signups/${s.id}/restore"
+                                style="display: inline; margin: 0 0 0 8px;"
+                              >
+                                <button type="submit" class="btn">Allow again</button>
+                              </form>
+                            `
+                          : html`
+                              <form
+                                method="post"
+                                action="/account/signups/${s.id}/revoke"
+                                style="margin: 0;"
+                              >
+                                <button type="submit" class="btn btn-danger">
+                                  Revoke
+                                </button>
+                              </form>
+                            `}
+                      </td>
+                    </tr>
+                  `,
+                )}
+              </tbody>
+            </table>
+          </div>
+        `
+      : ''}
+
     <h2>Account status</h2>
     ${human.paused_at
       ? html`
@@ -296,6 +367,11 @@ export function accountPage(opts: {
         `
       : ''}
   `;
+}
+
+function shortDid(did: string): string {
+  if (did.length <= 30) return did;
+  return `${did.slice(0, 22)}…${did.slice(-6)}`;
 }
 
 function formatRelative(d: Date): string {
