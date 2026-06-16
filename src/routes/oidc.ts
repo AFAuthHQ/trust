@@ -23,8 +23,10 @@ import type { KeyVault } from '../lib/keyvault.js';
 import type { OidcClient, OidcClientRegistry } from '../lib/oidc-clients.js';
 import { deriveSubH, pseudonymKeyBytes } from '../lib/pseudonym.js';
 import { mintIdToken } from '../lib/signing.js';
-import type { Store } from '../lib/store/index.js';
+import type { HumanRecord, Store } from '../lib/store/index.js';
 import { generateToken } from '../lib/tokens.js';
+import { layout } from '../views/layout.js';
+import { oidcConsentPage } from '../views/oidc.js';
 
 /** Stashed /authorize params survive the signin bounce (keeps `next` short). */
 const AUTH_REQUEST_TTL_SECONDS = 600;
@@ -38,6 +40,8 @@ interface AuthRequest {
   codeChallenge: string;
   nonce?: string;
   scope: string;
+  /** OIDC `prompt` (we honor `consent`); preserved across the signin bounce. */
+  prompt?: string;
 }
 
 interface CodeRecord {
@@ -70,6 +74,44 @@ function withParams(uri: string, params: Record<string, string | undefined>): st
  *  unvalidated target, so render plainly instead. */
 function authError(c: Context, error: string, description: string): Response {
   return c.text(`${error}: ${description}`, 400);
+}
+
+/** Human-friendly RP name for the consent page: the registrable host of the
+ *  redirect_uri, minus a leading `api.` (e.g. artidrop.ai). Falls back to the
+ *  client_id. The registry carries no display name, and this avoids trusting
+ *  one the RP could spoof. */
+function clientLabel(client: OidcClient): string {
+  const first = client.redirectUris[0];
+  if (!first) return client.clientId;
+  try {
+    return new URL(first).host.replace(/^api\./, '');
+  } catch {
+    return client.clientId;
+  }
+}
+
+/** Mint a single-use authorization code bound to PKCE + RP and redirect back to
+ *  the RP with `code` (+ `state`). Shared by the silent and post-consent paths. */
+async function issueCodeRedirect(
+  c: Context,
+  redis: Redis,
+  client: OidcClient,
+  req: AuthRequest,
+  human: HumanRecord,
+  rid: string | undefined,
+): Promise<Response> {
+  const code = generateToken();
+  const record: CodeRecord = {
+    humanId: human.id,
+    clientId: req.clientId,
+    serviceDid: client.serviceDid,
+    redirectUri: req.redirectUri,
+    codeChallenge: req.codeChallenge,
+    nonce: req.nonce,
+  };
+  await redis.set(`oidc:code:${code}`, JSON.stringify(record), 'EX', CODE_TTL_SECONDS);
+  if (rid) await redis.del(`oidc:areq:${rid}`);
+  return c.redirect(withParams(req.redirectUri, { code, state: req.state }));
 }
 
 async function readTokenParams(c: Context): Promise<Record<string, string>> {
@@ -151,6 +193,7 @@ export function createOidcRoutes(deps: {
       const scope = c.req.query('scope') ?? '';
       const state = c.req.query('state') ?? undefined;
       const nonce = c.req.query('nonce') ?? undefined;
+      const prompt = c.req.query('prompt') ?? undefined;
       // redirect_uri is validated now → param errors may bounce back to it.
       if (responseType !== 'code') {
         return c.redirect(withParams(redirectUri, { error: 'unsupported_response_type', state }));
@@ -165,7 +208,7 @@ export function createOidcRoutes(deps: {
           withParams(redirectUri, { error: 'invalid_scope', error_description: 'openid scope required', state }),
         );
       }
-      req = { clientId, redirectUri, state, codeChallenge, nonce, scope };
+      req = { clientId, redirectUri, state, codeChallenge, nonce, scope, prompt };
     }
 
     const human = await currentHuman(c, store);
@@ -178,19 +221,58 @@ export function createOidcRoutes(deps: {
       return c.redirect(`/signin?next=${encodeURIComponent(`/oidc/authorize?rid=${newRid}`)}`);
     }
 
-    // Signed in → issue a single-use authorization code bound to PKCE + RP.
-    const code = generateToken();
-    const record: CodeRecord = {
-      humanId: human.id,
-      clientId: req.clientId,
-      serviceDid: client.serviceDid,
-      redirectUri: req.redirectUri,
-      codeChallenge: req.codeChallenge,
-      nonce: req.nonce,
-    };
-    await redis.set(`oidc:code:${code}`, JSON.stringify(record), 'EX', CODE_TTL_SECONDS);
-    if (rid) await redis.del(`oidc:areq:${rid}`);
-    return c.redirect(withParams(req.redirectUri, { code, state: req.state }));
+    // `prompt=consent`: confirm before minting a code WHEN the human already had
+    // a session. A fresh post-signin resume (`rid` present) skips it — the signin
+    // they just completed IS the confirmation. Without this, a live trust session
+    // silently re-authorizes, so an explicit logout from the RP lands straight
+    // back in with no UI (the behavior the RP's `prompt=consent` asks us to stop).
+    if (req.prompt === 'consent' && !rid) {
+      const consentRid = generateToken();
+      await redis.set(`oidc:areq:${consentRid}`, JSON.stringify(req), 'EX', AUTH_REQUEST_TTL_SECONDS);
+      return c.html(
+        await layout({
+          title: 'Authorize sign-in · trust.afauth.org',
+          path: '/oidc/authorize',
+          body: oidcConsentPage({
+            email: human.primary_email,
+            clientLabel: clientLabel(client),
+            rid: consentRid,
+          }),
+        }),
+      );
+    }
+
+    // Signed in (and consent satisfied) → issue a single-use code bound to PKCE + RP.
+    return issueCodeRedirect(c, redis, client, req, human, rid);
+  });
+
+  // ---- consent decision (POST from the prompt=consent page) --------
+  // Same-origin form, so the global origin-based CSRF guard covers it.
+  app.post('/oidc/authorize/decision', async (c) => {
+    const form = await c.req.parseBody();
+    const rid = typeof form.rid === 'string' ? form.rid : '';
+    const decision = typeof form.decision === 'string' ? form.decision : '';
+    if (!rid) return authError(c, 'invalid_request', 'missing rid');
+
+    const raw = await redis.get(`oidc:areq:${rid}`);
+    if (!raw) return authError(c, 'invalid_request', 'authorization request expired — please try again');
+    const req = JSON.parse(raw) as AuthRequest;
+    const client = oidcClients.get(req.clientId);
+    if (!client) return authError(c, 'invalid_client', 'unknown client_id');
+
+    const human = await currentHuman(c, store);
+    if (!human) {
+      // Session lapsed between rendering consent and submitting → re-auth, then
+      // resume (the resume skips consent since the signin is the confirmation).
+      return c.redirect(`/signin?next=${encodeURIComponent(`/oidc/authorize?rid=${rid}`)}`);
+    }
+
+    if (decision !== 'approve') {
+      await redis.del(`oidc:areq:${rid}`);
+      return c.redirect(withParams(req.redirectUri, { error: 'access_denied', state: req.state }));
+    }
+
+    return issueCodeRedirect(c, redis, client, req, human, rid);
   });
 
   // ---- token endpoint (server-to-server; JSON) ---------------------
